@@ -1,0 +1,19 @@
+{
+  "name": "trova-monorepo",
+  "private": true,
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w packages/contract && npm run build -w packages/engine && npm run build -w packages/plugin",
+    "typecheck": "tsc -p packages/contract && tsc -p packages/engine && tsc -p packages/eval && tsc -p packages/plugin",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.24.0"
+  }
+}
