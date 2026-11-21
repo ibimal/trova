@@ -1,6 +1,6 @@
 # trova-cli
 
-Local keyword and semantic search for folders of Markdown notes. `trova` indexes a folder on your machine and searches it by keyword, by meaning, or both. It runs as a command-line tool, an HTTP API and an MCP server for AI agents. It is built on [qmd](https://github.com/tobi/qmd), and nothing leaves the machine except the one-time model download.
+Local keyword and semantic search for folders of Markdown notes. `trova` indexes a folder on your machine and searches it by keyword, by meaning, or both. It runs as a command-line tool, an HTTP API and an MCP server for AI agents. It is built on [qmd](https://github.com/tobi/qmd). Your notes never leave the machine: the only network traffic is the model download from Hugging Face, and after that `trova` works offline.
 
 The same engine powers the Trova plugin for Obsidian, which lives in the [same repository](https://github.com/ibimal/trova).
 
@@ -14,6 +14,8 @@ The same engine powers the Trova plugin for Obsidian, which lives in the [same r
 ```bash
 npm install -g trova-cli
 ```
+
+The installed package takes about 300 MB, mostly llama.cpp binaries; the models come on top (see below).
 
 npm 11 does not run the install scripts of dependencies unless you allow them, and it lists the ones it skipped: `node-llama-cpp` and some `tree-sitter` packages. On macOS with Apple Silicon `trova` works without them, because the prebuilt binaries are used. On other platforms `node-llama-cpp` may need its script; this is not tested.
 
@@ -83,6 +85,18 @@ Every command takes `--json`, `-n`/`--limit <n>` and `-c`/`--collection <name>`.
 
 `trova mcp --http` serves the same tools at `http://127.0.0.1:8181/mcp`. That server has no token: it refuses any request whose `Host` or `Origin` is not a loopback address, so web pages cannot reach it, but any program on this machine can. Start it only while you use it.
 
+## Models
+
+qmd downloads its default models from Hugging Face into `~/.cache/qmd/models/` the first time they are needed. Each model has its own licence, and by downloading it you accept that licence:
+
+| Model | Used for | Size | Licence |
+| --- | --- | --- | --- |
+| [EmbeddingGemma 300M](https://huggingface.co/google/embeddinggemma-300m) (GGUF build by [ggml-org](https://huggingface.co/ggml-org/embeddinggemma-300M-GGUF)) | Embeddings: vector search and related notes | about 330 MB | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) and the [Gemma Prohibited Use Policy](https://ai.google.dev/gemma/prohibited_use_policy) |
+| [Qwen3-Reranker 0.6B](https://huggingface.co/Qwen/Qwen3-Reranker-0.6B) | Deep mode: reranking | about 1.7 GB together with the next model | Apache-2.0 |
+| [qmd-query-expansion 1.7B](https://huggingface.co/tobil/qmd-query-expansion-1.7B-gguf) | Deep mode: query expansion | | MIT |
+
+`trova` does not include or redistribute any model.
+
 ## Where data lives
 
 | Data | Location |
@@ -90,6 +104,10 @@ Every command takes `--json`, `-n`/`--limit <n>` and `-c`/`--collection <name>`.
 | Index, sidecar tables, logs, attachment text | `~/.cache/trova/`, or the folder in `TROVA_HOME` |
 | Models | qmd's model cache, `~/.cache/qmd/models/` |
 
+## Acknowledgements
+
+`trova` is built on [qmd](https://github.com/tobi/qmd) by Tobi Lütke, which does the indexing, the keyword and vector search, and the model handling. qmd is MIT-licensed and installs as a dependency. `trova` adds the block-level index, related notes, typo rescue, the daemon, the HTTP API and the MCP server on top of it.
+
 ## Licence
 
-MIT; see `LICENSE`.
+`trova` is MIT-licensed; see `LICENSE`. The models have their own licences; see "Models" above.

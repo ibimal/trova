@@ -1,6 +1,6 @@
 # Trova
 
-Trova is an Obsidian plugin with four surfaces on one local index: Instant search, a Connections and Ask pane, a Context basket, and Vault care. The engine (`trova-cli`, CLI `trova`) runs on your machine on top of [qmd](https://github.com/tobi/qmd). Nothing leaves the machine except the one-time model download.
+Trova is an Obsidian plugin with four surfaces on one local index: Instant search, a Connections and Ask pane, a Context basket, and Vault care. The engine (`trova-cli`, CLI `trova`) runs on your machine on top of [qmd](https://github.com/tobi/qmd). Your notes never leave the machine: the only network traffic is the model download from Hugging Face. The models have their own licences, listed in `packages/engine/README.md`; the default embedding model, EmbeddingGemma, is under Google's Gemma Terms of Use.
 
 This repository implements a written features and API specification that is not published here. The sections "Deviations from the spec" and "Additions beyond the spec" below record where the build differs from it, and `docs/spikes.md` records what was checked before and during the build. This README covers how to build, install and run it.
 
@@ -105,4 +105,4 @@ Each of these is a decision made during the build. `docs/spikes.md` gives the ev
 
 ## Licence
 
-MIT; see `LICENSE`. No code is copied from Smart Connections or Omnisearch.
+MIT; see `LICENSE`. Search and indexing come from [qmd](https://github.com/tobi/qmd) by Tobi Lütke (MIT), a dependency. No code is copied from qmd, Smart Connections or Omnisearch.
