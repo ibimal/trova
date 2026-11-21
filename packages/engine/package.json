@@ -2,7 +2,28 @@
   "name": "trova-cli",
   "version": "0.1.0",
   "description": "Local keyword and semantic search for Markdown notes: a command-line tool, an HTTP API and an MCP server, on top of qmd",
+  "keywords": [
+    "search",
+    "semantic-search",
+    "markdown",
+    "notes",
+    "obsidian",
+    "mcp",
+    "cli",
+    "qmd",
+    "local-first"
+  ],
   "license": "MIT",
+  "author": "Bimal",
+  "homepage": "https://github.com/ibimal/trova/tree/main/packages/engine#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ibimal/trova.git",
+    "directory": "packages/engine"
+  },
+  "bugs": {
+    "url": "https://github.com/ibimal/trova/issues"
+  },
   "type": "module",
   "bin": {
     "trova": "bin/trova"

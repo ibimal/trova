@@ -50,7 +50,7 @@ Then check it:
 trova doctor
 ```
 
-`trova help` lists every command. `trova eval` runs the evaluation on the fixture vault with a stand-in embedder; `trova eval --real` uses the real models; `trova eval --perf` measures the engine-side latency budgets on a generated 10,000-note vault.
+`packages/engine/README.md` documents the command-line tool, and `trova help` lists every command. `trova eval` runs the evaluation on the fixture vault with a stand-in embedder; `trova eval --real` uses the real models; `trova eval --perf` measures the engine-side latency budgets on a generated 10,000-note vault.
 
 The engine runs as one daemon per machine, started by the plugin or by `trova watch`. It listens on 127.0.0.1 only, and every request needs the token it writes to `daemon.json` in its data folder, which only your user account can read. It stops by itself after 30 minutes with no client and no job.
 
