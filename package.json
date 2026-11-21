@@ -6,8 +6,8 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w packages/contract && npm run build -w packages/engine && npm run build -w packages/plugin",
-    "typecheck": "tsc -p packages/contract && tsc -p packages/engine && tsc -p packages/eval && tsc -p packages/plugin",
+    "build": "npm run build -w packages/contract && npm run build -w packages/engine",
+    "typecheck": "tsc -p packages/contract && tsc -p packages/engine && tsc -p packages/eval",
     "test": "vitest run"
   },
   "devDependencies": {

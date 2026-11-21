@@ -1,6 +1,6 @@
 # Spike findings
 
-The specification (not published in this repository) listed four items to verify before building. These are the findings, checked against qmd 2.9.0, the first and only qmd version the engine supports, Obsidian typings 1.14.4 and Node 24.22.2.
+The specification (not published in this repository) listed four items to verify before building. Three concern the engine and are below; the fourth, Bases custom functions, concerns the Obsidian plugin and is recorded in its repository, [trova-obsidian](https://github.com/ibimal/trova-obsidian/blob/main/docs/notes.md). These are the findings, checked against qmd 2.9.0, the first and only qmd version the engine supports, Obsidian typings 1.14.4 and Node 24.22.2.
 
 ## 1. A second read-only connection can query qmd's vector table
 
@@ -13,17 +13,13 @@ Two details matter:
 
 ## 2. `fetch` streams a response body with the origin `app://obsidian.md`
 
-**Confirmed.** The server answers preflights, sets `Access-Control-Allow-Origin: app://obsidian.md`, and rejects any other `Origin` with 403. The engine tests read NDJSON and SSE bodies incrementally through `fetch` and abort them mid-stream. The plugin's `EngineClient` uses the same `fetch` and `ReadableStream` calls, and it reads the streamed search and Ask results inside Obsidian 1.15.1.
+**Confirmed.** The server answers preflights, sets `Access-Control-Allow-Origin: app://obsidian.md`, and rejects any other `Origin` with 403. The engine tests read NDJSON and SSE bodies incrementally through `fetch` and abort them mid-stream. The Obsidian plugin's `EngineClient` uses the same `fetch` and `ReadableStream` calls, and it reads the streamed search and Ask results inside Obsidian 1.15.1.
 
 ## 3. `searchLex` position data
 
 **`searchLex` gives no match position.** Its result has a score and an optional `chunkPos` only for vector hits. The shim therefore does not call `searchLex`. It builds an FTS5 `MATCH` expression from the parsed query and runs it on the read-only connection with qmd's own weights (`bm25(documents_fts, 1.5, 4.0, 1.0)`). It then locates the matches in the body itself: the block with the most matches becomes the result's block, and the snippet and highlights come from that block.
 
 This also lets the lex lane honour the parsed query exactly: OR-groups, exact words, phrases, `in:title` and exclusions.
-
-## 4. Bases custom functions
-
-**Not supported.** The typings expose `Plugin.registerBasesView(viewId, registration)` and the `BasesView` class. They expose nothing that registers a formula function. Package 14 therefore ships as a custom Bases view (`packages/plugin/src/features/bases.ts`): a table with the note, its similarity score to the active note, and its top three related notes. The view registers only when `registerBasesView` exists, so the plugin still loads on Obsidian 1.9.
 
 ## Other findings from the build
 
@@ -42,18 +38,3 @@ This also lets the lex lane honour the parsed query exactly: OR-groups, exact wo
 ## Measured on the fixture vault
 
 `trova eval --real` on the 201-source fixture vault with qmd's default models: Ask nDCG@10 0.991, Instant nDCG@10 0.998, Connections Recall@20 0.886. These numbers come from generated notes with strongly separated topics, so they show that the pipeline works; they are not evidence about a real vault.
-
-## Worker timings on 10,000 generated notes
-
-`packages/plugin/test/extras.test.ts` builds 10,000 notes of about 300 words each and times the worker's index on Node 24 (M-series Mac). The vocabulary has only 40 words, so every query word matches thousands of notes; a real vault is easier.
-
-| Measurement | Result |
-| --- | --- |
-| Metadata pass, 10,000 files | 78 ms |
-| Body pass, per 50-file batch | 6.9 ms |
-| Search, title lane and overlay (engine running), p50 / p95 | 1.7 ms / 6.2 ms |
-| Search, title lane and all bodies (no engine), p50 / p95 | 13.6 ms / 23.9 ms |
-| Typo rescue, slowest of three queries | 31.8 ms |
-| Fresh edit indexed | 0.2 ms |
-
-These times exclude the message hop to the worker and the DOM render. They were not measured inside Obsidian.
