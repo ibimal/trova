@@ -2,9 +2,23 @@
 // gets a markdown file named `<original path>.md` under ~/.cache/trova/attachments/<collection>/.
 // qmd indexes that folder as the collection `<collection>-att`.
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { EngineError, extname, inScope, MAX_TEXT_BYTES, type CollectionOptions } from "./contract/index.js";
+import {
+  EngineError,
+  extname,
+  inScope,
+  MAX_TEXT_BYTES,
+  type CollectionOptions,
+} from "./contract/index.js";
 import type { Sidecar } from "./sidecar.js";
 
 export const DEFAULT_ATTACHMENTS = ["pdf", "canvas", "image"];
@@ -47,14 +61,25 @@ function xmlTexts(xml: string, tag: string): string[] {
 
 export async function extractPdf(data: Uint8Array): Promise<string> {
   const pdfjs = (await import("pdfjs-dist/legacy/build/pdf.mjs")) as unknown as {
-    getDocument(src: Record<string, unknown>): { promise: Promise<PdfDoc>; destroy(): Promise<void> };
+    getDocument(src: Record<string, unknown>): {
+      promise: Promise<PdfDoc>;
+      destroy(): Promise<void>;
+    };
   };
   interface PdfDoc {
     numPages: number;
-    getPage(n: number): Promise<{ getTextContent(): Promise<{ items: { str?: string; hasEOL?: boolean }[] }> }>;
+    getPage(
+      n: number,
+    ): Promise<{ getTextContent(): Promise<{ items: { str?: string; hasEOL?: boolean }[] }> }>;
   }
   // The loading task owns the document; destroying the task releases both.
-  const task = pdfjs.getDocument({ data, useSystemFonts: true, disableFontFace: true, isEvalSupported: false, verbosity: 0 });
+  const task = pdfjs.getDocument({
+    data,
+    useSystemFonts: true,
+    disableFontFace: true,
+    isEvalSupported: false,
+    verbosity: 0,
+  });
   const doc = await task.promise;
   const pages: string[] = [];
   let bytes = 0;
@@ -77,7 +102,9 @@ export async function extractPdf(data: Uint8Array): Promise<string> {
 }
 
 export function extractCanvas(json: string): string {
-  let data: { nodes?: { type?: string; text?: string; file?: string; url?: string; label?: string }[] };
+  let data: {
+    nodes?: { type?: string; text?: string; file?: string; url?: string; label?: string }[];
+  };
   try {
     data = JSON.parse(json) as typeof data;
   } catch {
@@ -99,7 +126,8 @@ export function extractCanvas(json: string): string {
 export async function extractOffice(data: Uint8Array, ext: string): Promise<string> {
   const { unzipSync, strFromU8 } = await import("fflate");
   const files = unzipSync(data, {
-    filter: (f) => /^(word\/document\.xml|ppt\/slides\/slide\d+\.xml|xl\/sharedStrings\.xml)$/.test(f.name),
+    filter: (f) =>
+      /^(word\/document\.xml|ppt\/slides\/slide\d+\.xml|xl\/sharedStrings\.xml)$/.test(f.name),
   });
   if (ext === "docx") {
     const xml = files["word/document.xml"];
@@ -113,7 +141,9 @@ export async function extractOffice(data: Uint8Array, ext: string): Promise<stri
     return Object.keys(files)
       .filter((n) => n.startsWith("ppt/slides/"))
       .sort((a, b) => Number(/\d+/.exec(a)![0]) - Number(/\d+/.exec(b)![0]))
-      .map((name, i) => `## Slide ${i + 1}\n\n${xmlTexts(strFromU8(files[name]!), "a:t").join("\n")}`)
+      .map(
+        (name, i) => `## Slide ${i + 1}\n\n${xmlTexts(strFromU8(files[name]!), "a:t").join("\n")}`,
+      )
       .join("\n\n");
   }
   const shared = files["xl/sharedStrings.xml"];
@@ -153,7 +183,8 @@ export function attachmentDir(attachmentsRoot: string, collection: string): stri
 function textFile(dir: string, path: string): string {
   const target = resolve(dir, `${path}.md`);
   const rel = relative(resolve(dir), target);
-  if (!path || rel.startsWith("..") || resolve(rel) === rel) throw new EngineError("bad_request", `"${path}" is not a path inside the collection`);
+  if (!path || rel.startsWith("..") || resolve(rel) === rel)
+    throw new EngineError("bad_request", `"${path}" is not a path inside the collection`);
   return target;
 }
 
@@ -168,7 +199,13 @@ function removeText(dir: string, path: string): void {
 }
 
 /** Stores OCR text that the plugin pushed for an image. An empty text removes the entry. */
-export function storePushedText(sidecar: Sidecar, attachmentsRoot: string, collection: string, path: string, text: string): void {
+export function storePushedText(
+  sidecar: Sidecar,
+  attachmentsRoot: string,
+  collection: string,
+  path: string,
+  text: string,
+): void {
   const dir = attachmentDir(attachmentsRoot, collection);
   if (!text.trim()) {
     removeText(dir, path);
@@ -211,7 +248,13 @@ export async function syncAttachments(
       continue;
     }
     const known = manifest.get(rel);
-    if (known && !known.pushed && known.mtime === Math.round(stat.mtimeMs) && known.size === stat.size) continue;
+    if (
+      known &&
+      !known.pushed &&
+      known.mtime === Math.round(stat.mtimeMs) &&
+      known.size === stat.size
+    )
+      continue;
     await pause();
     let text = "";
     try {
@@ -225,7 +268,9 @@ export async function syncAttachments(
   }
   for (const [path, info] of manifest) {
     // Pushed OCR text stays while its image exists; extracted text goes when its file goes or its type is switched off.
-    const gone = info.pushed ? !existsSync(join(root, path)) || !types.includes("image") : !seen.has(path);
+    const gone = info.pushed
+      ? !existsSync(join(root, path)) || !types.includes("image")
+      : !seen.has(path);
     if (gone) {
       removeText(dir, path);
       sidecar.removeAttachment(collection, path);

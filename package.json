@@ -32,10 +32,11 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "tsc -p . && node build.mjs",
-    "typecheck": "tsc -p .",
+    "build": "vp pack",
+    "check": "vp check && tsc -p .",
     "test": "vp test run",
-    "prepublishOnly": "npm run build"
+    "format": "vp fmt",
+    "prepublishOnly": "npm run check && npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
@@ -51,7 +52,6 @@
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.0.0",
     "@types/picomatch": "^4.0.3",
-    "esbuild": "^0.24.0",
     "typescript": "^5.6.0",
     "vite-plus": "1.7.0"
   },

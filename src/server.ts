@@ -5,7 +5,14 @@ import { appendFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
-import { API_VERSION, ERROR_STATUS, EngineError, type ErrorBody, type HealthResponse, type ResultBatch } from "./contract/index.js";
+import {
+  API_VERSION,
+  ERROR_STATUS,
+  EngineError,
+  type ErrorBody,
+  type HealthResponse,
+  type ResultBatch,
+} from "./contract/index.js";
 import type { Engine } from "./engine.js";
 import { ENGINE_NAME, ENGINE_VERSION } from "./paths.js";
 import { dispatch } from "./routes.js";
@@ -34,13 +41,20 @@ export interface RunningServer {
 
 function toError(err: unknown): EngineError {
   if (err instanceof EngineError) return err;
-  if (err instanceof SyntaxError) return new EngineError("bad_request", "The request body is not valid JSON");
+  if (err instanceof SyntaxError)
+    return new EngineError("bad_request", "The request body is not valid JSON");
   const message = err instanceof Error ? err.message : String(err);
-  if (/model/i.test(message) && /(download|not found|missing)/i.test(message)) return new EngineError("model_missing", message, true);
+  if (/model/i.test(message) && /(download|not found|missing)/i.test(message))
+    return new EngineError("model_missing", message, true);
   return new EngineError("internal", message);
 }
 
-function sendJson(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
+function sendJson(
+  res: ServerResponse,
+  status: number,
+  body: unknown,
+  headers: Record<string, string> = {},
+): void {
   const text = body === undefined ? "" : JSON.stringify(body);
   res.writeHead(status, { "Content-Type": "application/json", ...headers });
   res.end(text);
@@ -48,7 +62,8 @@ function sendJson(res: ServerResponse, status: number, body: unknown, headers: R
 
 function sendError(res: ServerResponse, err: EngineError): void {
   const headers: Record<string, string> = {};
-  if (err.code === "model_loading" || err.code === "busy") headers["Retry-After"] = String(Math.ceil((err.retryAfterMs ?? 1000) / 1000));
+  if (err.code === "model_loading" || err.code === "busy")
+    headers["Retry-After"] = String(Math.ceil((err.retryAfterMs ?? 1000) / 1000));
   sendJson(res, ERROR_STATUS[err.code], err.toBody(), headers);
 }
 
@@ -57,12 +72,14 @@ async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> 
   let size = 0;
   for await (const chunk of req) {
     size += (chunk as Buffer).length;
-    if (size > MAX_BODY_BYTES) throw new EngineError("bad_request", "The request body is too large");
+    if (size > MAX_BODY_BYTES)
+      throw new EngineError("bad_request", "The request body is too large");
     chunks.push(chunk as Buffer);
   }
   if (size === 0) return {};
   const value = JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new EngineError("bad_request", "The request body must be a JSON object");
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new EngineError("bad_request", "The request body must be a JSON object");
   return value as Record<string, unknown>;
 }
 
@@ -75,7 +92,10 @@ export async function startServer(engine: Engine, opts: ServerOptions): Promise<
   const log = (line: string) => {
     if (!debug) return;
     try {
-      appendFileSync(join(engine.paths.logs, "daemon.log"), `${new Date().toISOString()} ${line}\n`);
+      appendFileSync(
+        join(engine.paths.logs, "daemon.log"),
+        `${new Date().toISOString()} ${line}\n`,
+      );
     } catch {
       /* logging must never break a request */
     }
@@ -87,12 +107,21 @@ export async function startServer(engine: Engine, opts: ServerOptions): Promise<
   };
 
   /** Streams batches as NDJSON. The first batch is produced before the headers, so early errors get a real status. */
-  const stream = async (res: ServerResponse, controller: AbortController, iterator: AsyncGenerator<ResultBatch>) => {
-    if (interactive >= MAX_INTERACTIVE) throw new EngineError("busy", "The interactive queue is full", true, 200);
+  const stream = async (
+    res: ServerResponse,
+    controller: AbortController,
+    iterator: AsyncGenerator<ResultBatch>,
+  ) => {
+    if (interactive >= MAX_INTERACTIVE)
+      throw new EngineError("busy", "The interactive queue is full", true, 200);
     interactive++;
     try {
       const first = await iterator.next();
-      res.writeHead(200, { "Content-Type": "application/x-ndjson", "Cache-Control": "no-store", "X-Accel-Buffering": "no" });
+      res.writeHead(200, {
+        "Content-Type": "application/x-ndjson",
+        "Cache-Control": "no-store",
+        "X-Accel-Buffering": "no",
+      });
       try {
         let step = first;
         while (!step.done) {
@@ -118,17 +147,32 @@ export async function startServer(engine: Engine, opts: ServerOptions): Promise<
     const method = req.method ?? "GET";
 
     if (path === "/health" && method === "GET") {
-      return sendJson(res, 200, { ok: true, name: ENGINE_NAME, version: ENGINE_VERSION, api: API_VERSION, apis: [API_VERSION] } satisfies HealthResponse);
+      return sendJson(res, 200, {
+        ok: true,
+        name: ENGINE_NAME,
+        version: ENGINE_VERSION,
+        api: API_VERSION,
+        apis: [API_VERSION],
+      } satisfies HealthResponse);
     }
     if (!authorised(req)) throw new EngineError("unauthorized", "Missing or wrong token");
     engine.lastActivity = Date.now();
     const body = method === "POST" || method === "DELETE" ? await readBody(req) : {};
     if (path === "/v1/events" && method === "GET") {
-      res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-store", Connection: "keep-alive" });
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-store",
+        Connection: "keep-alive",
+      });
       res.write(": connected\n\n");
       sse.add(res);
-      const off = engine.on((e) => res.write(`event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`));
-      const beat = setInterval(() => res.write(": heartbeat\n\n"), opts.heartbeatMs ?? HEARTBEAT_MS);
+      const off = engine.on((e) =>
+        res.write(`event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`),
+      );
+      const beat = setInterval(
+        () => res.write(": heartbeat\n\n"),
+        opts.heartbeatMs ?? HEARTBEAT_MS,
+      );
       res.on("close", () => {
         clearInterval(beat);
         off();
@@ -141,7 +185,8 @@ export async function startServer(engine: Engine, opts: ServerOptions): Promise<
       debug = (body as { on?: boolean }).on === true;
       return sendJson(res, 200, { debug });
     }
-    if (path === "/v1/search" || path === "/v1/ask") log(`${path} ${JSON.stringify((body as { query?: { raw?: string } }).query?.raw ?? "")}`);
+    if (path === "/v1/search" || path === "/v1/ask")
+      log(`${path} ${JSON.stringify((body as { query?: { raw?: string } }).query?.raw ?? "")}`);
     const controller = new AbortController();
     const onClose = () => {
       if (!res.writableEnded) controller.abort();
@@ -161,7 +206,9 @@ export async function startServer(engine: Engine, opts: ServerOptions): Promise<
     const origin = req.headers.origin;
     if (origin !== undefined) {
       if (origin !== ALLOWED_ORIGIN) {
-        return sendJson(res, 403, { error: { code: "unauthorized", message: "Origin not allowed", retryable: false } } satisfies ErrorBody);
+        return sendJson(res, 403, {
+          error: { code: "unauthorized", message: "Origin not allowed", retryable: false },
+        } satisfies ErrorBody);
       }
       res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
       res.setHeader("Vary", "Origin");

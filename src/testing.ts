@@ -4,7 +4,9 @@
 import { lightStem, type Lane } from "./contract/index.js";
 import type { DeepModels, Embedder } from "./backend.js";
 
-const STOP = new Set("the a an and or of to in is it for on with as at by be this that are was from".split(" "));
+const STOP = new Set(
+  "the a an and or of to in is it for on with as at by be this that are was from".split(" "),
+);
 
 function hash(text: string): number {
   let h = 2166136261;
@@ -44,7 +46,10 @@ export function hashEmbedder(dims = 96, id = "hash-embedder"): Embedder {
 
 /** Expansion and rerank stand-ins: rerank scores by the share of query words a document contains. */
 export function fakeDeep(delayMs = 0): DeepModels {
-  const words = (t: string) => new Set((t.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter((w) => !STOP.has(w)).map(lightStem));
+  const words = (t: string) =>
+    new Set(
+      (t.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter((w) => !STOP.has(w)).map(lightStem),
+    );
   return {
     async expand(query: string): Promise<{ type: Lane; query: string }[]> {
       if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
@@ -53,7 +58,10 @@ export function fakeDeep(delayMs = 0): DeepModels {
         { type: "vec", query: `notes about ${query}` },
       ];
     },
-    async rerank(query: string, docs: { id: string; text: string }[]): Promise<Map<string, number>> {
+    async rerank(
+      query: string,
+      docs: { id: string; text: string }[],
+    ): Promise<Map<string, number>> {
       if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
       const q = words(query);
       const out = new Map<string, number>();

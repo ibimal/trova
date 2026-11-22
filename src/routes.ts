@@ -18,7 +18,11 @@ export async function dispatch(
   signal?: AbortSignal,
 ): Promise<Dispatched> {
   const b = body as never;
-  const json = (value: unknown, status = 200): Dispatched => ({ kind: "json", status, body: value });
+  const json = (value: unknown, status = 200): Dispatched => ({
+    kind: "json",
+    status,
+    body: value,
+  });
   switch (`${method} ${path}`) {
     case "POST /v1/search":
       return { kind: "stream", batches: engine.search(b, signal) };
@@ -37,7 +41,8 @@ export async function dispatch(
     case "POST /v1/documents/multi-get":
       return json(engine.multiGet(b));
     case "POST /v1/index/sync":
-      if (typeof body["collection"] !== "string") throw new EngineError("bad_request", "The request needs a collection");
+      if (typeof body["collection"] !== "string")
+        throw new EngineError("bad_request", "The request needs a collection");
       return json(engine.sync(b), 202);
     case "GET /v1/index/status":
       return json(engine.status());
@@ -55,7 +60,11 @@ export async function dispatch(
         return json({ collections: await engine.listCollections() });
       }
       if (typeof body["contextPath"] === "string" && typeof body["name"] === "string") {
-        await engine.setContext(body["name"], body["contextPath"], typeof body["contextText"] === "string" ? body["contextText"] : null);
+        await engine.setContext(
+          body["name"],
+          body["contextPath"],
+          typeof body["contextText"] === "string" ? body["contextText"] : null,
+        );
         return json({ collections: await engine.listCollections() });
       }
       return json(await engine.addCollection(b));

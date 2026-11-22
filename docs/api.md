@@ -2,11 +2,11 @@
 
 Trova has three public interfaces. Each one is versioned on its own, so the engine and the Obsidian plugin can be released separately without breaking each other.
 
-| Interface | Used by | Version |
-| --- | --- | --- |
-| The HTTP API under `/v1` | The Obsidian plugin, and any other client | `API_VERSION` in `src/contract/types.ts`, MAJOR.MINOR |
-| The `trova` command's commands, flags and output, and the MCP tools | People, scripts and AI agents | The `trova-cli` package version, semantic versioning |
-| The Obsidian plugin's settings and commands | Obsidian users | The plugin's own version, in its repository |
+| Interface                                                           | Used by                                   | Version                                               |
+| ------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------------- |
+| The HTTP API under `/v1`                                            | The Obsidian plugin, and any other client | `API_VERSION` in `src/contract/types.ts`, MAJOR.MINOR |
+| The `trova` command's commands, flags and output, and the MCP tools | People, scripts and AI agents             | The `trova-cli` package version, semantic versioning  |
+| The Obsidian plugin's settings and commands                         | Obsidian users                            | The plugin's own version, in its repository           |
 
 ## The HTTP API
 

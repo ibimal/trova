@@ -63,7 +63,8 @@ function chunksOverlapping(chunks: ChunkRow[], block: Block, length: number): Ch
 export async function findDuplicates(input: AnalysisInput, ctx: JobCtx): Promise<DuplicatePair[]> {
   const { reader } = input;
   const { byHash, docs } = docIndex(input);
-  const blocksOf = (doc: Doc) => input.collections.find((c) => c.name === doc.collection)!.blocks(doc.source);
+  const blocksOf = (doc: Doc) =>
+    input.collections.find((c) => c.name === doc.collection)!.blocks(doc.source);
   const pairs = new Map<string, DuplicatePair>();
   const sourcePairs = new Set<string>();
   const pairKey = (a: string, b: string) => (a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`);
@@ -76,10 +77,26 @@ export async function findDuplicates(input: AnalysisInput, ctx: JobCtx): Promise
     }
     return noteVecs.get(hash) ?? null;
   };
-  const addPair = (a: Doc, b: Doc, kind: "block" | "source", similarity: number, aId = a.source, bId = b.source) => {
+  const addPair = (
+    a: Doc,
+    b: Doc,
+    kind: "block" | "source",
+    similarity: number,
+    aId = a.source,
+    bId = b.source,
+  ) => {
     const key = pairKey(aId, bId);
     if (pairs.has(key)) return;
-    pairs.set(key, { a: aId, b: bId, aTitle: a.entry.title, bTitle: b.entry.title, aPath: a.entry.path, bPath: b.entry.path, kind, similarity });
+    pairs.set(key, {
+      a: aId,
+      b: bId,
+      aTitle: a.entry.title,
+      bTitle: b.entry.title,
+      aPath: a.entry.path,
+      bPath: b.entry.path,
+      kind,
+      similarity,
+    });
   };
 
   // Identical text under two paths is a duplicate without any vector work.
@@ -128,7 +145,9 @@ export async function findDuplicates(input: AnalysisInput, ctx: JobCtx): Promise
       const signature = own.map((c) => c.seq).join(",");
       if (signatures.has(signature)) continue;
       signatures.add(signature);
-      const vec = meanVector(own.map((c) => vectors.get(`${c.hash}_${c.seq}`)).filter((v): v is Float32Array => !!v));
+      const vec = meanVector(
+        own.map((c) => vectors.get(`${c.hash}_${c.seq}`)).filter((v): v is Float32Array => !!v),
+      );
       if (!vec) continue;
       for (const n of reader.knn(vec, 8)) {
         if (n.hash === doc.entry.hash || n.similarity < DUPLICATE_BLOCK_COSINE - 0.1) continue;
@@ -140,10 +159,20 @@ export async function findDuplicates(input: AnalysisInput, ctx: JobCtx): Promise
           const oBlock = blockAt(blocksOf(o), pos);
           if (!oBlock || countWords(blockText(oText, oBlock)) < DUPLICATE_BLOCK_MIN_WORDS) continue;
           const oOwn = chunksOverlapping(oChunks, oBlock, oText.length);
-          const oVec = meanVector([...reader.vectors(oOwn.map((c) => `${c.hash}_${c.seq}`)).values()]);
+          const oVec = meanVector([
+            ...reader.vectors(oOwn.map((c) => `${c.hash}_${c.seq}`)).values(),
+          ]);
           if (!oVec) continue;
           const sim = cosine(vec, oVec);
-          if (sim >= DUPLICATE_BLOCK_COSINE) addPair(doc, o, "block", sim, blockId(doc.source, block.headingPath), blockId(o.source, oBlock.headingPath));
+          if (sim >= DUPLICATE_BLOCK_COSINE)
+            addPair(
+              doc,
+              o,
+              "block",
+              sim,
+              blockId(doc.source, block.headingPath),
+              blockId(o.source, oBlock.headingPath),
+            );
         }
       }
     }
@@ -170,7 +199,11 @@ function dot(a: Float32Array, b: Float32Array): number {
   return s;
 }
 
-const TOPIC_STOP = new Set("the and for with from that this notes note about into your what when how why are was not but all new one two use using".split(" "));
+const TOPIC_STOP = new Set(
+  "the and for with from that this notes note about into your what when how why are was not but all new one two use using".split(
+    " ",
+  ),
+);
 
 export async function findTopics(input: AnalysisInput, ctx: JobCtx): Promise<TopicCluster[]> {
   const { reader } = input;
@@ -237,7 +270,9 @@ export async function findTopics(input: AnalysisInput, ctx: JobCtx): Promise<Top
       const mean = meanVector(members);
       if (mean) centroids[c] = mean;
     }
-    ctx.progress(docs.length + Math.round(((iter + 1) / 12) * docs.length), docs.length * 2, { stage: "topics" });
+    ctx.progress(docs.length + Math.round(((iter + 1) / 12) * docs.length), docs.length * 2, {
+      stage: "topics",
+    });
     if (moved === 0 && iter > 0) break;
   }
 
@@ -280,15 +315,34 @@ export async function findTopics(input: AnalysisInput, ctx: JobCtx): Promise<Top
   const points = items.map((it) => project(it.vec));
   const xs = points.map((p) => p[0]);
   const ys = points.map((p) => p[1]);
-  const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const [minX, maxX, minY, maxY] = [
+    Math.min(...xs),
+    Math.max(...xs),
+    Math.min(...ys),
+    Math.max(...ys),
+  ];
   const scale = (v: number, lo: number, hi: number) => (hi === lo ? 0.5 : (v - lo) / (hi - lo));
 
   // Labels: the terms most specific to each cluster, from titles, headings and tags.
   const termsOf = (it: { doc: Doc }): string[] => {
     const c = input.collections.find((col) => col.name === it.doc.collection)!;
     const headings = c.blocks(it.doc.source).flatMap((b) => b.headings.slice(-1));
-    const text = [it.doc.entry.title, publicPath(it.doc.entry.qmdCollection, it.doc.entry.qmdPath).split("/").slice(0, -1).join(" "), ...headings, ...it.doc.entry.tags].join(" ");
-    return [...new Set((text.toLowerCase().match(/[\p{L}][\p{L}\p{N}]{2,}/gu) ?? []).filter((w) => !TOPIC_STOP.has(w)))];
+    const text = [
+      it.doc.entry.title,
+      publicPath(it.doc.entry.qmdCollection, it.doc.entry.qmdPath)
+        .split("/")
+        .slice(0, -1)
+        .join(" "),
+      ...headings,
+      ...it.doc.entry.tags,
+    ].join(" ");
+    return [
+      ...new Set(
+        (text.toLowerCase().match(/[\p{L}][\p{L}\p{N}]{2,}/gu) ?? []).filter(
+          (w) => !TOPIC_STOP.has(w),
+        ),
+      ),
+    ];
   };
   const tf: Map<string, number>[] = Array.from({ length: k }, () => new Map());
   const df = new Map<string, number>();
@@ -324,5 +378,7 @@ export async function findTopics(input: AnalysisInput, ctx: JobCtx): Promise<Top
       sources,
     });
   }
-  return clusters.sort((a, b) => b.sources.length - a.sources.length).map((c, i) => ({ ...c, id: i }));
+  return clusters
+    .sort((a, b) => b.sources.length - a.sources.length)
+    .map((c, i) => ({ ...c, id: i }));
 }

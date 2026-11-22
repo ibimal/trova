@@ -89,7 +89,14 @@ import { QmdBackend, type DeepModels, type Embedder } from "./backend.js";
 import { Jobs, type JobCtx } from "./jobs.js";
 import { ENGINE_NAME, ENGINE_VERSION, dataPaths, type DataPaths } from "./paths.js";
 import { QmdReader, buildFtsQuery } from "./reader.js";
-import { ATT_SUFFIX, Sidecar, buildMeta, publicPath, splitBlocks, type MetaEntry } from "./sidecar.js";
+import {
+  ATT_SUFFIX,
+  Sidecar,
+  buildMeta,
+  publicPath,
+  splitBlocks,
+  type MetaEntry,
+} from "./sidecar.js";
 
 /** Orders strings by their UTF-16 code units, as the default sort does, but states it. */
 const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
@@ -185,7 +192,12 @@ export class Engine {
 
   static async open(opts: EngineOptions = {}): Promise<Engine> {
     const paths = dataPaths(opts.home);
-    const backend = await QmdBackend.open({ dbPath: paths.qmdDb, embedder: opts.embedder, deep: opts.deep, embedModel: opts.embedModel });
+    const backend = await QmdBackend.open({
+      dbPath: paths.qmdDb,
+      embedder: opts.embedder,
+      deep: opts.deep,
+      embedModel: opts.embedModel,
+    });
     const reader = new QmdReader(paths.qmdDb);
     const problems = reader.schemaProblems();
     if (problems.length > 0) {
@@ -251,7 +263,8 @@ export class Engine {
   }
 
   private publicCollection(qmdCollection: string): string {
-    return qmdCollection.endsWith(ATT_SUFFIX) && this.attRegistered.has(qmdCollection.slice(0, -ATT_SUFFIX.length))
+    return qmdCollection.endsWith(ATT_SUFFIX) &&
+      this.attRegistered.has(qmdCollection.slice(0, -ATT_SUFFIX.length))
       ? qmdCollection.slice(0, -ATT_SUFFIX.length)
       : qmdCollection;
   }
@@ -267,7 +280,11 @@ export class Engine {
   }
 
   async addCollection(req: CollectionAddRequest): Promise<CollectionInfo> {
-    if (!req.name || !/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(req.name) || req.name.endsWith(ATT_SUFFIX)) {
+    if (
+      !req.name ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(req.name) ||
+      req.name.endsWith(ATT_SUFFIX)
+    ) {
       throw new EngineError("bad_request", `"${req.name}" is not a valid collection name`);
     }
     const existing = this.sidecar.collection(req.name);
@@ -289,7 +306,8 @@ export class Engine {
   }
 
   async removeCollection(name: string): Promise<void> {
-    if (!this.sidecar.collection(name)) throw new EngineError("not_found", `Unknown collection "${name}"`);
+    if (!this.sidecar.collection(name))
+      throw new EngineError("not_found", `Unknown collection "${name}"`);
     this.watchers.get(name)?.close();
     this.watchers.delete(name);
     await this.backend.removeCollection(name);
@@ -311,7 +329,8 @@ export class Engine {
   }
 
   async setContext(collection: string, path: string, text: string | null): Promise<void> {
-    if (!this.sidecar.collection(collection)) throw new EngineError("not_found", `Unknown collection "${collection}"`);
+    if (!this.sidecar.collection(collection))
+      throw new EngineError("not_found", `Unknown collection "${collection}"`);
     if (text) await this.backend.addContext(collection, path, text);
     else await this.backend.removeContext(collection, path);
     this.contextCache = null;
@@ -325,10 +344,12 @@ export class Engine {
         list.push({ path: c.path.replace(/^\/+|\/+$/g, ""), context: c.context });
         this.contextCache.set(c.collection, list);
       }
-      for (const list of this.contextCache.values()) list.sort((a, b) => b.path.length - a.path.length);
+      for (const list of this.contextCache.values())
+        list.sort((a, b) => b.path.length - a.path.length);
     }
     const list = this.contextCache.get(collection);
-    return list?.find((c) => c.path === "" || path === c.path || path.startsWith(`${c.path}/`))?.context;
+    return list?.find((c) => c.path === "" || path === c.path || path.startsWith(`${c.path}/`))
+      ?.context;
   }
 
   // ---------- watcher ----------
@@ -363,26 +384,41 @@ export class Engine {
     for (const r of req.renamed ?? []) {
       this.sidecar.recordRename(sourceId(req.collection, r.from), sourceId(req.collection, r.to));
     }
-    const jobId = this.jobs.enqueue("sync", `sync:${req.collection}`, (ctx) => this.runSync(ctx, req.collection));
+    const jobId = this.jobs.enqueue("sync", `sync:${req.collection}`, (ctx) =>
+      this.runSync(ctx, req.collection),
+    );
     return { jobId };
   }
 
   private async runSync(ctx: JobCtx, name: string): Promise<void> {
     const col = this.sidecar.collection(name);
     if (!col) return;
-    const hasAttachments = await syncAttachments(this.sidecar, this.paths.attachments, name, col.path, { ...col.options }, () => ctx.pause());
+    const hasAttachments = await syncAttachments(
+      this.sidecar,
+      this.paths.attachments,
+      name,
+      col.path,
+      { ...col.options },
+      () => ctx.pause(),
+    );
     if (hasAttachments && !this.attRegistered.has(name)) {
-      await this.backend.addCollection(name + ATT_SUFFIX, attachmentDir(this.paths.attachments, name));
+      await this.backend.addCollection(
+        name + ATT_SUFFIX,
+        attachmentDir(this.paths.attachments, name),
+      );
       this.attRegistered.add(name);
     }
     if (ctx.cancelled()) return;
     await ctx.pause();
-    await this.backend.update(this.qmdNames([name]), (done, total) => ctx.progress(done, total, { stage: "scan", collection: name }));
+    await this.backend.update(this.qmdNames([name]), (done, total) =>
+      ctx.progress(done, total, { stage: "scan", collection: name }),
+    );
     if (ctx.cancelled()) return;
     const changed = this.refreshMeta(name);
     this.vocabCache = null;
     this.sidecar.markIndexed(name, Date.now());
-    if (changed.length > 0) this.emit({ event: "results.stale", data: { collection: name, sources: changed } });
+    if (changed.length > 0)
+      this.emit({ event: "results.stale", data: { collection: name, sources: changed } });
     if ((await this.backend.pendingEmbeddings()) > 0) {
       this.jobs.enqueue("embed", "embed", (c) => this.runEmbed(c));
     } else {
@@ -394,7 +430,10 @@ export class Engine {
     const stored = this.reader.vectorModels();
     const current = this.backend.embedModelUri();
     if (stored.length > 0 && current && stored.some((m) => m.model !== current)) {
-      this.emit({ event: "model.changed", data: { model: this.backend.embedModelId(), previous: stored.map((m) => m.model) } });
+      this.emit({
+        event: "model.changed",
+        data: { model: this.backend.embedModelId(), previous: stored.map((m) => m.model) },
+      });
     }
     await ctx.pause();
     await this.backend.embedPending(
@@ -406,7 +445,9 @@ export class Engine {
   }
 
   private emitReady(): void {
-    const collections = this.sidecar.collectionNames().map((name) => ({ name, ...this.countsFor(name) }));
+    const collections = this.sidecar
+      .collectionNames()
+      .map((name) => ({ name, ...this.countsFor(name) }));
     this.emit({ event: "index.ready", data: { collections } });
   }
 
@@ -444,7 +485,10 @@ export class Engine {
         } catch {
           /* keep qmd's timestamps */
         }
-        upserts.push({ entry: buildMeta(qmdCollection, row.path, row.hash, text, { created, modified }), blocks: splitBlocks(text) });
+        upserts.push({
+          entry: buildMeta(qmdCollection, row.path, row.hash, text, { created, modified }),
+          blocks: splitBlocks(text),
+        });
         changed.push(sourceId(name, path));
       }
     }
@@ -455,8 +499,10 @@ export class Engine {
   }
 
   attachmentText(req: AttachmentTextRequest): SyncResponse {
-    if (!this.sidecar.collection(req.collection)) throw new EngineError("not_found", `Unknown collection "${req.collection}"`);
-    if (attachmentType(req.path) !== "image") throw new EngineError("bad_request", "Only image text can be pushed");
+    if (!this.sidecar.collection(req.collection))
+      throw new EngineError("not_found", `Unknown collection "${req.collection}"`);
+    if (attachmentType(req.path) !== "image")
+      throw new EngineError("bad_request", "Only image text can be pushed");
     storePushedText(this.sidecar, this.paths.attachments, req.collection, req.path, req.text);
     return this.sync({ collection: req.collection, changed: [req.path] });
   }
@@ -472,13 +518,16 @@ export class Engine {
     const dims = this.reader.dims() ?? undefined;
     const hasVec = this.reader.hasVectors();
     const capabilities: Capability[] = ["lex", "fuzzy", "blocks", "attachments"];
-    if (hasVec || models.embed.state !== "missing") capabilities.push("vec", "relatedByVector", "duplicates", "topics", "graph");
+    if (hasVec || models.embed.state !== "missing")
+      capabilities.push("vec", "relatedByVector", "duplicates", "topics", "graph");
     if (models.rerank.state === "ready") capabilities.push("rerank");
     if (models.expand.state === "ready") capabilities.push("expansion");
     const collections = this.sidecar.collectionNames().map((name) => {
       const c = this.sidecar.collection(name)!;
       const counts = this.countsFor(name);
-      const oversized = [...this.sidecar.entries(name).values()].filter((e) => e.oversized).map((e) => e.path);
+      const oversized = [...this.sidecar.entries(name).values()]
+        .filter((e) => e.oversized)
+        .map((e) => e.path);
       return {
         name,
         path: c.path,
@@ -493,7 +542,11 @@ export class Engine {
       api: API_VERSION,
       engine: { name: ENGINE_NAME, version: ENGINE_VERSION, backend: this.backend.name },
       capabilities,
-      models: { embed: { ...models.embed, ...(dims ? { dims } : {}) }, rerank: models.rerank, expand: models.expand },
+      models: {
+        embed: { ...models.embed, ...(dims ? { dims } : {}) },
+        rerank: models.rerank,
+        expand: models.expand,
+      },
       collections,
       jobs: this.jobs.active(),
       paused: this.jobs.paused,
@@ -515,7 +568,8 @@ export class Engine {
   async resume(): Promise<void> {
     this.jobs.resume();
     // A pause stops a running embedding run; resuming starts a new one for the documents still waiting.
-    if ((await this.backend.pendingEmbeddings()) > 0 && !this.closed) this.jobs.enqueue("embed", "embed", (c) => this.runEmbed(c));
+    if ((await this.backend.pendingEmbeddings()) > 0 && !this.closed)
+      this.jobs.enqueue("embed", "embed", (c) => this.runEmbed(c));
   }
 
   async drain(): Promise<void> {
@@ -529,7 +583,10 @@ export class Engine {
   /** Starts the download of the Deep models. The caller must have the user's confirmation. */
   downloadModels(): SyncResponse {
     const jobId = this.jobs.enqueue("models", "models", async () => {
-      this.emit({ event: "engine.state", data: { state: "downloading", models: ["rerank", "expand"] } });
+      this.emit({
+        event: "engine.state",
+        data: { state: "downloading", models: ["rerank", "expand"] },
+      });
       await this.backend.downloadDeepModels();
       this.emit({ event: "engine.state", data: { state: "running", models: "ready" } });
     });
@@ -540,7 +597,10 @@ export class Engine {
 
   private filterCtx(collection: string) {
     const graph = this.sidecar.graph(collection);
-    return { isOrphan: (path: string) => this.sidecar.isOrphan(collection, path), resolveLink: graph.resolve };
+    return {
+      isOrphan: (path: string) => this.sidecar.isOrphan(collection, path),
+      resolveLink: graph.resolve,
+    };
   }
 
   private passes(collection: string, entry: MetaEntry, filters: Filter[]): boolean {
@@ -575,7 +635,8 @@ export class Engine {
     }
     const to = block ? block.end : text.length;
     let snip = makeSnippet(text, ranges, 180, Math.min(from, to), to);
-    if (snip.snippet.trim() === "" && block) snip = makeSnippet(text, ranges, 180, Math.max(fmEnd, block.start), to);
+    if (snip.snippet.trim() === "" && block)
+      snip = makeSnippet(text, ranges, 180, Math.max(fmEnd, block.start), to);
     const result: Result = {
       id: block ? blockId(source, block.headingPath) : source,
       source,
@@ -588,8 +649,15 @@ export class Engine {
       matchedBy: hit.matchedBy,
       label,
     };
-    if (block) result.block = { id: blockId(source, block.headingPath), headings: block.headings, start: block.start, end: block.end };
-    const type = extname(entry.path) === "md" ? null : (attachmentType(entry.path) ?? extname(entry.path));
+    if (block)
+      result.block = {
+        id: blockId(source, block.headingPath),
+        headings: block.headings,
+        start: block.start,
+        end: block.end,
+      };
+    const type =
+      extname(entry.path) === "md" ? null : (attachmentType(entry.path) ?? extname(entry.path));
     if (type) result.type = type;
     const context = await this.contextFor(collection, entry.path);
     if (context) result.context = context;
@@ -606,17 +674,30 @@ export class Engine {
       if (q.filters.length === 0 || q.must.length > 0) return [];
       for (const collection of collections) {
         for (const entry of this.sidecar.entries(collection).values()) {
-          if (this.passes(collection, entry, q.filters)) hits.push({ collection, entry, scores: { lex: 0 }, matchedBy: ["lex"] });
+          if (this.passes(collection, entry, q.filters))
+            hits.push({ collection, entry, scores: { lex: 0 }, matchedBy: ["lex"] });
         }
       }
-      return hits.sort((a, b) => b.entry.modified - a.entry.modified || (a.entry.path < b.entry.path ? -1 : 1)).slice(0, limit);
+      return hits
+        .sort(
+          (a, b) => b.entry.modified - a.entry.modified || (a.entry.path < b.entry.path ? -1 : 1),
+        )
+        .slice(0, limit);
     }
-    const strictGroups = q.must.filter((g) => g.some((t) => t.kind !== "word" || t.field === "heading"));
+    const strictGroups = q.must.filter((g) =>
+      g.some((t) => t.kind !== "word" || t.field === "heading"),
+    );
     const strictNot = q.mustNot.filter((t) => t.kind !== "word");
     const strict: ParsedQuery | null =
-      strictGroups.length || strictNot.length ? { ...q, must: strictGroups, mustNot: strictNot } : null;
+      strictGroups.length || strictNot.length
+        ? { ...q, must: strictGroups, mustNot: strictNot }
+        : null;
     const selective = strict !== null || q.filters.length > 0;
-    const rows = this.reader.lex(match, this.qmdNames(collections), selective ? Math.max(200, limit * 10) : limit * 2);
+    const rows = this.reader.lex(
+      match,
+      this.qmdNames(collections),
+      selective ? Math.max(200, limit * 10) : limit * 2,
+    );
     const seen = new Set<string>();
     for (const row of rows) {
       const collection = this.publicCollection(row.collection);
@@ -627,7 +708,13 @@ export class Engine {
       if (strict) {
         const text = this.reader.content(entry.hash) ?? "";
         const headings = this.sidecar.blocks(key).flatMap((b) => b.headings.slice(-1));
-        if (!matchesTerms({ title: entry.title, aliases: entry.aliases, headings, body: text }, strict)) continue;
+        if (
+          !matchesTerms(
+            { title: entry.title, aliases: entry.aliases, headings, body: text },
+            strict,
+          )
+        )
+          continue;
       }
       seen.add(key);
       hits.push({ collection, entry, scores: { lex: row.score }, matchedBy: ["lex"] });
@@ -642,7 +729,12 @@ export class Engine {
   }
 
   /** The lex lane with typo rescue: when few results arrive, misspelt words are replaced from the vocabulary. */
-  private lexLane(q: ParsedQuery, collections: string[], limit: number, fuzzy: boolean): { hits: Hit[]; correction?: Correction; query: ParsedQuery } {
+  private lexLane(
+    q: ParsedQuery,
+    collections: string[],
+    limit: number,
+    fuzzy: boolean,
+  ): { hits: Hit[]; correction?: Correction; query: ParsedQuery } {
     const hits = this.lexHits(q, collections, limit);
     if (!fuzzy || hits.length >= TYPO_RESCUE_MAX_RESULTS) return { hits, query: q };
     let rescued = q;
@@ -650,7 +742,12 @@ export class Engine {
     const to: string[] = [];
     for (const group of q.must) {
       for (const term of group) {
-        if (term.kind !== "word" || typoMaxEdits(term.text) === 0 || this.reader.hasPrefix(term.text)) continue;
+        if (
+          term.kind !== "word" ||
+          typoMaxEdits(term.text) === 0 ||
+          this.reader.hasPrefix(term.text)
+        )
+          continue;
         const best = suggestCorrections(term.text, this.vocabulary(), 1, 5, true)[0];
         if (!best) continue;
         rescued = replaceWord(rescued, term.text, best.term);
@@ -659,12 +756,21 @@ export class Engine {
       }
     }
     if (from.length === 0) return { hits, query: q };
-    const fixed = this.lexHits(rescued, collections, limit).map((h): Hit => ({ ...h, matchedBy: ["fuzzy"] }));
+    const fixed = this.lexHits(rescued, collections, limit).map((h): Hit => ({
+      ...h,
+      matchedBy: ["fuzzy"],
+    }));
     if (fixed.length <= hits.length) return { hits, query: q };
     return { hits: fixed, correction: { from: from.join(" "), to: to.join(" ") }, query: rescued };
   }
 
-  private async vecHits(text: string, collections: string[], limit: number, filters: Filter[], asDocument = false): Promise<Hit[]> {
+  private async vecHits(
+    text: string,
+    collections: string[],
+    limit: number,
+    filters: Filter[],
+    asDocument = false,
+  ): Promise<Hit[]> {
     if (!text.trim() || !this.reader.hasVectors()) return [];
     const vector = await this.backend.embedText(text, !asDocument);
     if (!vector) return [];
@@ -672,9 +778,18 @@ export class Engine {
   }
 
   /** Nearest stored chunks mapped to sources: one hit per source, at its best chunk. */
-  private nearest(vector: Float32Array, collections: string[], limit: number, filters: Filter[], skipHashes: Set<string>, k = limit * 6): Hit[] {
+  private nearest(
+    vector: Float32Array,
+    collections: string[],
+    limit: number,
+    filters: Filter[],
+    skipHashes: Set<string>,
+    k = limit * 6,
+  ): Hit[] {
     const allowed = new Set(collections);
-    const near = this.reader.knn(vector, k + skipHashes.size * 4, this.qmdNames(collections)).filter((n) => !skipHashes.has(n.hash));
+    const near = this.reader
+      .knn(vector, k + skipHashes.size * 4, this.qmdNames(collections))
+      .filter((n) => !skipHashes.has(n.hash));
     const docs = this.reader.docsByHashes([...new Set(near.map((n) => n.hash))]);
     const chunkPos = this.reader.chunksFor([...docs.keys()]);
     const best = new Map<string, Hit>();
@@ -688,10 +803,18 @@ export class Engine {
         const prev = best.get(key);
         if (prev && (prev.scores.vec ?? 0) >= n.similarity) continue;
         const pos = chunkPos.get(n.hash)?.find((c) => c.seq === n.seq)?.pos ?? 0;
-        best.set(key, { collection, entry, pos, scores: { vec: n.similarity }, matchedBy: ["vec"] });
+        best.set(key, {
+          collection,
+          entry,
+          pos,
+          scores: { vec: n.similarity },
+          matchedBy: ["vec"],
+        });
       }
     }
-    return [...best.values()].sort((a, b) => (b.scores.vec ?? 0) - (a.scores.vec ?? 0)).slice(0, limit);
+    return [...best.values()]
+      .sort((a, b) => (b.scores.vec ?? 0) - (a.scores.vec ?? 0))
+      .slice(0, limit);
   }
 
   private hitKey(h: Hit): string {
@@ -706,14 +829,26 @@ export class Engine {
         const prev = byKey.get(key);
         if (!prev) byKey.set(key, { ...h, scores: { ...h.scores }, matchedBy: [...h.matchedBy] });
         else {
-          prev.scores = { ...h.scores, ...prev.scores, lex: prev.scores.lex ?? h.scores.lex, vec: prev.scores.vec ?? h.scores.vec };
+          prev.scores = {
+            ...h.scores,
+            ...prev.scores,
+            lex: prev.scores.lex ?? h.scores.lex,
+            vec: prev.scores.vec ?? h.scores.vec,
+          };
           for (const m of h.matchedBy) if (!prev.matchedBy.includes(m)) prev.matchedBy.push(m);
           // Keyword hits keep their matched block; a vector hit only adds its chunk position when there is none.
-          if (prev.pos === undefined && !prev.matchedBy.includes("lex") && !prev.matchedBy.includes("fuzzy")) prev.pos = h.pos;
+          if (
+            prev.pos === undefined &&
+            !prev.matchedBy.includes("lex") &&
+            !prev.matchedBy.includes("fuzzy")
+          )
+            prev.pos = h.pos;
         }
       }
     }
-    const fused = rrf(lists.map((items) => ({ weight: 1, items: items.map((h) => this.hitKey(h)) })));
+    const fused = rrf(
+      lists.map((items) => ({ weight: 1, items: items.map((h) => this.hitKey(h)) })),
+    );
     return fused.map((f, i) => {
       const h = byKey.get(f.id)!;
       h.scores.fused = f.score;
@@ -724,7 +859,11 @@ export class Engine {
     });
   }
 
-  private async toResults(hits: Hit[], q: ParsedQuery | null, labelOf: (hit: Hit, rank: number) => Result["label"] | null): Promise<Result[]> {
+  private async toResults(
+    hits: Hit[],
+    q: ParsedQuery | null,
+    labelOf: (hit: Hit, rank: number) => Result["label"] | null,
+  ): Promise<Result[]> {
     const out: Result[] = [];
     for (let i = 0; i < hits.length; i++) {
       const label = labelOf(hits[i]!, i + 1);
@@ -733,7 +872,8 @@ export class Engine {
     return out;
   }
 
-  private cosineLabel = (hit: Hit): Result["label"] | null => labelForCosine(hit.scores.vec ?? 0, thresholdsFor(this.backend.embedModelId()));
+  private cosineLabel = (hit: Hit): Result["label"] | null =>
+    labelForCosine(hit.scores.vec ?? 0, thresholdsFor(this.backend.embedModelId()));
 
   // ---------- search ----------
 
@@ -747,7 +887,11 @@ export class Engine {
       const fuzzy = req.fuzzy !== false;
       const deadline = req.deadlineMs ? Date.now() + req.deadlineMs : Infinity;
       const text = queryText(q);
-      const lanes: ("lex" | "vec" | "hybrid")[] = q.lane ? [q.lane === "lex" ? "lex" : "vec"] : req.lanes?.length ? req.lanes : ["lex"];
+      const lanes: ("lex" | "vec" | "hybrid")[] = q.lane
+        ? [q.lane === "lex" ? "lex" : "vec"]
+        : req.lanes?.length
+          ? req.lanes
+          : ["lex"];
       let lex: { hits: Hit[]; correction?: Correction; query: ParsedQuery } | null = null;
       const getLex = () => (lex ??= this.lexLane(q, collections, limit, fuzzy));
       for (let i = 0; i < lanes.length; i++) {
@@ -757,9 +901,17 @@ export class Engine {
         if (lane === "lex") {
           const l = getLex();
           const results = await this.toResults(l.hits, l.query, (_h, rank) => labelForRank(rank));
-          yield { stage: "lex", results, final: last, ...(l.correction ? { correction: l.correction } : {}) };
+          yield {
+            stage: "lex",
+            results,
+            final: last,
+            ...(l.correction ? { correction: l.correction } : {}),
+          };
         } else if (lane === "vec") {
-          const hits = await withTimeout(this.vecHits(text, collections, limit, q.filters, q.lane === "hyde"), deadline - Date.now());
+          const hits = await withTimeout(
+            this.vecHits(text, collections, limit, q.filters, q.lane === "hyde"),
+            deadline - Date.now(),
+          );
           checkAborted(signal);
           const results = hits === "timeout" ? [] : await this.toResults(hits, q, this.cosineLabel);
           yield { stage: "vec", results, final: last };
@@ -767,12 +919,24 @@ export class Engine {
           const l = getLex();
           if (!lanes.includes("lex")) {
             const results = await this.toResults(l.hits, l.query, (_h, rank) => labelForRank(rank));
-            yield { stage: "lex", results, final: false, ...(l.correction ? { correction: l.correction } : {}) };
+            yield {
+              stage: "lex",
+              results,
+              final: false,
+              ...(l.correction ? { correction: l.correction } : {}),
+            };
           }
-          const vec = await withTimeout(this.vecHits(text, collections, limit, q.filters), deadline - Date.now());
+          const vec = await withTimeout(
+            this.vecHits(text, collections, limit, q.filters),
+            deadline - Date.now(),
+          );
           checkAborted(signal);
           const fused = this.fuse([l.hits, vec === "timeout" ? [] : vec]).slice(0, limit);
-          yield { stage: "fused", results: await this.toResults(fused, l.query, (_h, rank) => labelForRank(rank)), final: last };
+          yield {
+            stage: "fused",
+            results: await this.toResults(fused, l.query, (_h, rank) => labelForRank(rank)),
+            final: last,
+          };
         }
         if (Date.now() > deadline && !last) {
           yield { stage: lane === "hybrid" ? "fused" : lane, results: [], final: true };
@@ -787,7 +951,10 @@ export class Engine {
   private validateQuery(q: unknown): asserts q is ParsedQuery {
     const p = q as ParsedQuery | undefined;
     if (!p || !Array.isArray(p.must) || !Array.isArray(p.mustNot) || !Array.isArray(p.filters)) {
-      throw new EngineError("bad_request", "The request needs a parsed query with must, mustNot and filters");
+      throw new EngineError(
+        "bad_request",
+        "The request needs a parsed query with must, mustNot and filters",
+      );
     }
   }
 
@@ -808,7 +975,12 @@ export class Engine {
       if (q.lane) {
         if (q.lane === "lex") {
           const l = this.lexLane(q, collections, limit, fuzzy);
-          yield { stage: "lex", results: await this.toResults(l.hits, l.query, rankLabel), final: true, ...(l.correction ? { correction: l.correction } : {}) };
+          yield {
+            stage: "lex",
+            results: await this.toResults(l.hits, l.query, rankLabel),
+            final: true,
+            ...(l.correction ? { correction: l.correction } : {}),
+          };
         } else {
           const hits = await this.vecHits(text, collections, limit, q.filters, q.lane === "hyde");
           yield { stage: "vec", results: await this.toResults(hits, q, rankLabel), final: true };
@@ -844,18 +1016,33 @@ export class Engine {
         note = "model_missing";
       }
       if (mode === "fast") {
-        yield { stage: "fused", results: fusedResults, final: true, mode, ...(note ? { note } : {}) };
+        yield {
+          stage: "fused",
+          results: fusedResults,
+          final: true,
+          mode,
+          ...(note ? { note } : {}),
+        };
         return;
       }
       yield { stage: "fused", results: fusedResults, final: false, mode };
 
-      const deep = await withTimeout(this.deepPass(q, lex, vec, collections, limit, fuzzy, signal), deadline - Date.now());
+      const deep = await withTimeout(
+        this.deepPass(q, lex, vec, collections, limit, fuzzy, signal),
+        deadline - Date.now(),
+      );
       checkAborted(signal);
       if (deep === "timeout") {
         yield { stage: "fused", results: fusedResults, final: true, mode, note: "rerank_skipped" };
         return;
       }
-      yield { stage: "rerank", results: deep.results, final: true, mode, expansions: deep.expansions };
+      yield {
+        stage: "rerank",
+        results: deep.results,
+        final: true,
+        mode,
+        expansions: deep.expansions,
+      };
     } finally {
       end();
     }
@@ -868,7 +1055,13 @@ export class Engine {
   private relaxLex(lex: { hits: Hit[]; query: ParsedQuery }, collections: string[]): void {
     const q = lex.query;
     if (lex.hits.length >= ASK_RELAX_BELOW || q.must.length < 2) return;
-    const words = q.must.flat().filter((t) => t.kind !== "word" || !ASK_STOPWORDS.has(t.text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "")));
+    const words = q.must
+      .flat()
+      .filter(
+        (t) =>
+          t.kind !== "word" ||
+          !ASK_STOPWORDS.has(t.text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "")),
+      );
     if (words.length < 2) return;
     const relaxed: ParsedQuery = { ...q, must: [words] };
     const seen = new Set(lex.hits.map((h) => this.hitKey(h)));
@@ -888,16 +1081,28 @@ export class Engine {
     signal?: AbortSignal,
   ): Promise<{ results: Result[]; expansions: { type: Lane; query: string }[] }> {
     const text = queryText(q);
-    const expansions = (await this.backend.expand(text)).filter((e) => e.query.trim() && e.query.trim().toLowerCase() !== text.toLowerCase());
+    const expansions = (await this.backend.expand(text)).filter(
+      (e) => e.query.trim() && e.query.trim().toLowerCase() !== text.toLowerCase(),
+    );
     const lists: Hit[][] = [lex.hits, vec];
     for (const sub of expansions) {
       // A model call that already runs finishes; cancellation is checked between stages.
       if (signal?.aborted) break;
       if (sub.type === "lex") {
         const parsed = parseQuery(sub.query, { mode: "ask" }).query;
-        lists.push(this.lexLane({ ...parsed, filters: q.filters }, collections, ASK_LANE_LIMIT, fuzzy).hits);
+        lists.push(
+          this.lexLane({ ...parsed, filters: q.filters }, collections, ASK_LANE_LIMIT, fuzzy).hits,
+        );
       } else {
-        lists.push(await this.vecHits(sub.query, collections, ASK_LANE_LIMIT, q.filters, sub.type === "hyde"));
+        lists.push(
+          await this.vecHits(
+            sub.query,
+            collections,
+            ASK_LANE_LIMIT,
+            q.filters,
+            sub.type === "hyde",
+          ),
+        );
       }
     }
     const fused = this.fuse(lists);
@@ -906,7 +1111,9 @@ export class Engine {
     const docs = prelim.map((r) => {
       const entry = this.sidecar.entry(r.collection!, r.path)!;
       const full = this.reader.content(entry.hash) ?? "";
-      const body = r.block ? full.slice(r.block.start, r.block.end) : full.slice(frontmatterEnd(full));
+      const body = r.block
+        ? full.slice(r.block.start, r.block.end)
+        : full.slice(frontmatterEnd(full));
       return { id: r.id, text: `${r.title}\n${body}`.slice(0, 2400) };
     });
     const scores = await this.backend.rerank(text, docs);
@@ -914,9 +1121,20 @@ export class Engine {
     const blended = prelim
       .map((r, i) => {
         const rerank = scores.get(r.id);
-        const final = rerank === undefined ? (r.scores.fused ?? 0) / maxFused : blendRerank(i + 1, (r.scores.fused ?? 0) / maxFused, rerank);
-        const matchedBy: MatchedBy[] = rerank === undefined ? r.matchedBy : [...r.matchedBy, "rerank"];
-        return { r: { ...r, matchedBy, scores: { ...r.scores, ...(rerank === undefined ? {} : { rerank }) } }, final };
+        const final =
+          rerank === undefined
+            ? (r.scores.fused ?? 0) / maxFused
+            : blendRerank(i + 1, (r.scores.fused ?? 0) / maxFused, rerank);
+        const matchedBy: MatchedBy[] =
+          rerank === undefined ? r.matchedBy : [...r.matchedBy, "rerank"];
+        return {
+          r: {
+            ...r,
+            matchedBy,
+            scores: { ...r.scores, ...(rerank === undefined ? {} : { rerank }) },
+          },
+          final,
+        };
       })
       .sort((a, b) => b.final - a.final)
       .slice(0, limit)
@@ -926,7 +1144,9 @@ export class Engine {
 
   // ---------- related ----------
 
-  private locate(id: string): { collection: string; entry: MetaEntry; headingPath?: string } | null {
+  private locate(
+    id: string,
+  ): { collection: string; entry: MetaEntry; headingPath?: string } | null {
     let parsed = parseId(id);
     if (!parsed) return null;
     if (!this.sidecar.collection(parsed.collection)) return null;
@@ -946,7 +1166,11 @@ export class Engine {
   /** The vector of an anchor: stored vectors for a source or block, a fresh embedding for text. */
   private async anchorVector(anchor: EngineAnchor): Promise<AnchorVector | null> {
     const set = [anchor.source, anchor.block, anchor.text].filter((v) => v != null && v !== "");
-    if (set.length !== 1) throw new EngineError("bad_request", "Exactly one of source, block or text must be set on the anchor");
+    if (set.length !== 1)
+      throw new EngineError(
+        "bad_request",
+        "Exactly one of source, block or text must be set on the anchor",
+      );
     if (anchor.text) {
       if (!this.reader.hasVectors()) return null;
       const vector = await this.backend.embedText(anchor.text, false);
@@ -962,7 +1186,10 @@ export class Engine {
     let wanted = chunks;
     let text = full;
     if (anchor.block) {
-      const block = findBlock(this.sidecar.blocks(sourceId(collection, entry.path)), found.headingPath ?? "");
+      const block = findBlock(
+        this.sidecar.blocks(sourceId(collection, entry.path)),
+        found.headingPath ?? "",
+      );
       if (!block) throw new EngineError("not_found", `Unknown block "${id}"`);
       // A block's vector is the normalised mean of the chunks that overlap it.
       wanted = chunks.filter((c, i) => {
@@ -999,7 +1226,10 @@ export class Engine {
       // 1. The nearest chunks, without the anchor's own source.
       const own = anchor.entry ? new Set([anchor.entry.hash]) : new Set<string>();
       const ownChunks = anchor.entry ? this.reader.chunks(anchor.entry.hash).length : 0;
-      const near = this.reader.knn(anchor.vector, RELATED_NEAREST_CHUNKS + ownChunks, this.qmdNames(collections)).filter((n) => !own.has(n.hash)).slice(0, RELATED_NEAREST_CHUNKS);
+      const near = this.reader
+        .knn(anchor.vector, RELATED_NEAREST_CHUNKS + ownChunks, this.qmdNames(collections))
+        .filter((n) => !own.has(n.hash))
+        .slice(0, RELATED_NEAREST_CHUNKS);
       const docs = this.reader.docsByHashes([...new Set(near.map((n) => n.hash))]);
       const chunkPos = this.reader.chunksFor([...docs.keys()]);
 
@@ -1018,14 +1248,20 @@ export class Engine {
           const entry = this.sidecar.entry(collection, publicPath(doc.collection, doc.path));
           if (!entry || entry.hash !== n.hash) continue;
           const source = sourceId(collection, entry.path);
-          if (source === anchorSource || excluded.has(source) || !this.passes(collection, entry, filters)) continue;
+          if (
+            source === anchorSource ||
+            excluded.has(source) ||
+            !this.passes(collection, entry, filters)
+          )
+            continue;
           const pos = chunkPos.get(n.hash)?.find((c) => c.seq === n.seq)?.pos ?? 0;
           const block = blockAt(this.sidecar.blocks(source), pos);
           if (!block) continue;
           let s = sources.get(source);
           if (!s) sources.set(source, (s = { collection, entry, blocks: new Map() }));
           const prev = s.blocks.get(block.headingPath);
-          if (!prev || prev.score < n.similarity) s.blocks.set(block.headingPath, { block, score: n.similarity, pos });
+          if (!prev || prev.score < n.similarity)
+            s.blocks.set(block.headingPath, { block, score: n.similarity, pos });
         }
       }
 
@@ -1036,7 +1272,15 @@ export class Engine {
       const scored = [...sources.values()]
         .map((s) => {
           const blocks = [...s.blocks.values()].sort((a, b) => b.score - a.score);
-          return { ...s, ranked: blocks, best: blocks[0]!.score, score: sourceScore(blocks.map((b) => b.score), thresholds) };
+          return {
+            ...s,
+            ranked: blocks,
+            best: blocks[0]!.score,
+            score: sourceScore(
+              blocks.map((b) => b.score),
+              thresholds,
+            ),
+          };
         })
         .filter((s) => {
           const label = labelForCosine(s.best, thresholds);
@@ -1051,14 +1295,32 @@ export class Engine {
         for (const b of s.ranked.slice(0, perSource)) {
           const label = labelForCosine(b.score, thresholds);
           if (!label || (label === "loose" && !req.loose)) continue;
-          blockResults.push(await this.toResult({ collection: s.collection, entry: s.entry, pos: b.block.start, scores: { vec: b.score }, matchedBy: ["vec"] }, null, label));
+          blockResults.push(
+            await this.toResult(
+              {
+                collection: s.collection,
+                entry: s.entry,
+                pos: b.block.start,
+                scores: { vec: b.score },
+                matchedBy: ["vec"],
+              },
+              null,
+              label,
+            ),
+          );
         }
         if (granularity === "block") {
           results.push(...blockResults);
           continue;
         }
         const top = await this.toResult(
-          { collection: s.collection, entry: s.entry, pos: s.ranked[0]!.block.start, scores: { vec: s.best, fused: s.score }, matchedBy: ["vec"] },
+          {
+            collection: s.collection,
+            entry: s.entry,
+            pos: s.ranked[0]!.block.start,
+            scores: { vec: s.best, fused: s.score },
+            matchedBy: ["vec"],
+          },
           null,
           labelForCosine(s.best, thresholds)!,
         );
@@ -1074,13 +1336,16 @@ export class Engine {
           if (anchorLinks.has(s.entry.path)) links.push(s.entry.path);
         }
         sourceResult.why = {
-          keywords: keywords(full.slice(s.ranked[0]!.block.start, s.ranked[0]!.block.end), 200).filter((w) => anchorKeywords.has(w)).slice(0, 6),
+          keywords: keywords(full.slice(s.ranked[0]!.block.start, s.ranked[0]!.block.end), 200)
+            .filter((w) => anchorKeywords.has(w))
+            .slice(0, 6),
           links: [...new Set(links)],
           tags: s.entry.tags.filter((t) => anchorTags.has(t)),
         };
         results.push(sourceResult);
       }
-      if (granularity === "block") results.sort((a, b) => (b.scores.vec ?? 0) - (a.scores.vec ?? 0));
+      if (granularity === "block")
+        results.sort((a, b) => (b.scores.vec ?? 0) - (a.scores.vec ?? 0));
       return { anchorIndexed: true, results: results.slice(0, limit) };
     });
   }
@@ -1106,7 +1371,8 @@ export class Engine {
     if (hit !== undefined) return hit;
     const keys = this.reader.chunks(hash).map((c) => `${c.hash}_${c.seq}`);
     const vector = keys.length ? meanVector([...this.reader.vectors(keys).values()]) : null;
-    if (this.noteVectors.size >= 4000) this.noteVectors.delete(this.noteVectors.keys().next().value!);
+    if (this.noteVectors.size >= 4000)
+      this.noteVectors.delete(this.noteVectors.keys().next().value!);
     this.noteVectors.set(hash, vector ?? null);
     return vector ?? null;
   }
@@ -1118,14 +1384,34 @@ export class Engine {
    */
   async graph(req: GraphRequest, signal?: AbortSignal): Promise<GraphResponse> {
     const limit = Math.max(1, Math.min(60, req.limit ?? 24));
-    const related = await this.related({ anchor: req.anchor, granularity: "source", limit, collections: req.collections, filters: req.filters, loose: req.loose }, signal);
+    const related = await this.related(
+      {
+        anchor: req.anchor,
+        granularity: "source",
+        limit,
+        collections: req.collections,
+        filters: req.filters,
+        loose: req.loose,
+      },
+      signal,
+    );
     if (!related.anchorIndexed) return { anchorIndexed: false, anchor: null, nodes: [], edges: [] };
     return this.jobs.interactiveCall(async () => {
       const thresholds = thresholdsFor(this.backend.embedModelId());
-      const anchorId = req.anchor.source ?? (req.anchor.block ? parseId(req.anchor.block)?.source : null) ?? null;
+      const anchorId =
+        req.anchor.source ?? (req.anchor.block ? parseId(req.anchor.block)?.source : null) ?? null;
       const anchorFound = anchorId ? this.locate(anchorId) : null;
       const anchor: GraphNode | null = anchorFound
-        ? { id: sourceId(anchorFound.collection, anchorFound.entry.path), path: anchorFound.entry.path, title: anchorFound.entry.title, collection: anchorFound.collection, score: 1, label: "strong", snippet: "", tags: anchorFound.entry.tags }
+        ? {
+            id: sourceId(anchorFound.collection, anchorFound.entry.path),
+            path: anchorFound.entry.path,
+            title: anchorFound.entry.title,
+            collection: anchorFound.collection,
+            score: 1,
+            label: "strong",
+            snippet: "",
+            tags: anchorFound.entry.tags,
+          }
         : null;
       const located = new Map<string, { collection: string; entry: MetaEntry }>();
       const nodes: GraphNode[] = [];
@@ -1134,14 +1420,33 @@ export class Engine {
         if (!found) continue;
         this.sidecar.graph(found.collection);
         located.set(r.source, found);
-        nodes.push({ id: r.source, path: r.path, title: r.title, collection: found.collection, score: r.scores.vec ?? 0, label: r.label, snippet: r.snippet, tags: found.entry.tags });
+        nodes.push({
+          id: r.source,
+          path: r.path,
+          title: r.title,
+          collection: found.collection,
+          score: r.scores.vec ?? 0,
+          label: r.label,
+          snippet: r.snippet,
+          tags: found.entry.tags,
+        });
       }
-      const linked = (a: { collection: string; entry: MetaEntry }, b: { collection: string; entry: MetaEntry }) =>
-        a.collection === b.collection && (a.entry.links.includes(b.entry.path) || b.entry.links.includes(a.entry.path));
+      const linked = (
+        a: { collection: string; entry: MetaEntry },
+        b: { collection: string; entry: MetaEntry },
+      ) =>
+        a.collection === b.collection &&
+        (a.entry.links.includes(b.entry.path) || b.entry.links.includes(a.entry.path));
       const edges: GraphEdge[] = [];
       if (anchor && anchorFound) {
         this.sidecar.graph(anchorFound.collection);
-        for (const n of nodes) edges.push({ a: anchor.id, b: n.id, similarity: n.score, linked: linked(anchorFound, located.get(n.id)!) });
+        for (const n of nodes)
+          edges.push({
+            a: anchor.id,
+            b: n.id,
+            similarity: n.score,
+            linked: linked(anchorFound, located.get(n.id)!),
+          });
       }
       checkAborted(signal);
       // Edges between the related sources, from their note vectors.
@@ -1165,7 +1470,12 @@ export class Engine {
         degree[c.j]!++;
         const a = nodes[c.i]!;
         const b = nodes[c.j]!;
-        edges.push({ a: a.id, b: b.id, similarity: Math.min(1, c.similarity), linked: linked(located.get(a.id)!, located.get(b.id)!) });
+        edges.push({
+          a: a.id,
+          b: b.id,
+          similarity: Math.min(1, c.similarity),
+          linked: linked(located.get(a.id)!, located.get(b.id)!),
+        });
       }
       return { anchorIndexed: true, anchor, nodes, edges };
     });
@@ -1177,7 +1487,10 @@ export class Engine {
     if (!Array.isArray(req.terms)) throw new EngineError("bad_request", "The request needs terms");
     const suggestions: VocabSuggestResponse["suggestions"] = {};
     for (const term of req.terms) {
-      suggestions[term] = this.reader.hasPrefix(term) && typoMaxEdits(term) === 0 ? [] : suggestCorrections(term, this.vocabulary(), 1, 5, true);
+      suggestions[term] =
+        this.reader.hasPrefix(term) && typoMaxEdits(term) === 0
+          ? []
+          : suggestCorrections(term, this.vocabulary(), 1, 5, true);
     }
     return { suggestions };
   }
@@ -1197,12 +1510,23 @@ export class Engine {
         }
       }
     }
-    return { keys: Object.fromEntries([...keys.entries()].sort(([a], [b]) => compareText(a, b)).map(([k, v]) => [k, [...v].sort(compareText)])) };
+    return {
+      keys: Object.fromEntries(
+        [...keys.entries()]
+          .sort(([a], [b]) => compareText(a, b))
+          .map(([k, v]) => [k, [...v].sort(compareText)]),
+      ),
+    };
   }
 
   // ---------- documents ----------
 
-  private body(collection: string, entry: MetaEntry, headingPath: string | undefined, neighbours = 0): DocumentBody {
+  private body(
+    collection: string,
+    entry: MetaEntry,
+    headingPath: string | undefined,
+    neighbours = 0,
+  ): DocumentBody {
     const source = sourceId(collection, entry.path);
     const text = this.reader.content(entry.hash) ?? "";
     if (headingPath === undefined) {
@@ -1210,13 +1534,19 @@ export class Engine {
     }
     const blocks = this.sidecar.blocks(source);
     const index = blocks.findIndex((b) => b.headingPath === headingPath);
-    if (index === -1) throw new EngineError("not_found", `Unknown block "${source}#${headingPath}"`);
+    if (index === -1)
+      throw new EngineError("not_found", `Unknown block "${source}#${headingPath}"`);
     const make = (b: Block): DocumentBody => ({
       id: blockId(source, b.headingPath),
       source,
       path: entry.path,
       title: entry.title,
-      block: { id: blockId(source, b.headingPath), headings: b.headings, start: b.start, end: b.end },
+      block: {
+        id: blockId(source, b.headingPath),
+        headings: b.headings,
+        start: b.start,
+        end: b.end,
+      },
       content: blockText(text, b),
     });
     const doc = make(blocks[index]!);
@@ -1236,7 +1566,8 @@ export class Engine {
       // A bare path, relative to the given collection or to any collection.
       const [path, heading] = req.id.split(/#(.*)/s) as [string, string | undefined];
       for (const collection of this.collectionsFor(req.collection ? [req.collection] : undefined)) {
-        const entry = this.sidecar.entry(collection, path) ?? this.sidecar.entry(collection, `${path}.md`);
+        const entry =
+          this.sidecar.entry(collection, path) ?? this.sidecar.entry(collection, `${path}.md`);
         if (entry && !entry.excluded) {
           found = { collection, entry, headingPath: heading };
           break;
@@ -1267,8 +1598,12 @@ export class Engine {
     }
     if (req.glob) {
       const isMatch = picomatch(req.glob, { nocase: true });
-      outer: for (const collection of this.collectionsFor(req.collection ? [req.collection] : undefined)) {
-        for (const entry of [...this.sidecar.entries(collection).values()].sort((a, b) => (a.path < b.path ? -1 : 1))) {
+      outer: for (const collection of this.collectionsFor(
+        req.collection ? [req.collection] : undefined,
+      )) {
+        for (const entry of [...this.sidecar.entries(collection).values()].sort((a, b) =>
+          a.path < b.path ? -1 : 1,
+        )) {
           if (entry.excluded || !isMatch(entry.path)) continue;
           if (!push(this.body(collection, entry, undefined))) break outer;
         }
@@ -1296,7 +1631,10 @@ export class Engine {
       const jobId = this.jobs.enqueue("duplicates", "duplicates", async (ctx) => {
         const pairs = await findDuplicates(this.analysisInput(), ctx);
         if (ctx.cancelled()) {
-          this.duplicates = { ...this.duplicates, state: this.duplicates.computedAt ? "done" : "none" };
+          this.duplicates = {
+            ...this.duplicates,
+            state: this.duplicates.computedAt ? "done" : "none",
+          };
           return;
         }
         this.duplicates = { state: "done", pairs, computedAt: Date.now() };

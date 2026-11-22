@@ -11,7 +11,12 @@
 
 import Database from "better-sqlite3";
 import * as sqliteVec from "sqlite-vec";
-import { QMD_BM25_WEIGHTS, type ParsedQuery, type Term, type VocabEntry } from "./contract/index.js";
+import {
+  QMD_BM25_WEIGHTS,
+  type ParsedQuery,
+  type Term,
+  type VocabEntry,
+} from "./contract/index.js";
 
 export interface DocRow {
   id: number;
@@ -49,7 +54,8 @@ function ftsTerm(term: Term): string | null {
   if (tokens.length === 0) return null;
   const phrase = `"${tokens.join(" ")}"`;
   const prefix = term.kind === "word" && !CJK_CHAR.test(tokens[tokens.length - 1]!) ? "*" : "";
-  const scoped = term.field === "title" ? `{filepath title} : ${phrase}${prefix}` : `${phrase}${prefix}`;
+  const scoped =
+    term.field === "title" ? `{filepath title} : ${phrase}${prefix}` : `${phrase}${prefix}`;
   return scoped;
 }
 
@@ -133,12 +139,23 @@ export class QmdReader {
     for (const [table, wanted] of Object.entries(SCHEMA)) {
       const have = (columnsOf.all(table) as { name: string }[]).map((r) => r.name);
       if (have.length === 0) problems.push(`table ${table} is missing`);
-      else if (table === "documents_fts" && have.join(",") !== wanted.join(",")) problems.push(`documents_fts has columns ${have.join(", ")}, not ${wanted.join(", ")}`);
-      else for (const column of wanted) if (!have.includes(column)) problems.push(`column ${table}.${column} is missing`);
+      else if (table === "documents_fts" && have.join(",") !== wanted.join(","))
+        problems.push(`documents_fts has columns ${have.join(", ")}, not ${wanted.join(", ")}`);
+      else
+        for (const column of wanted)
+          if (!have.includes(column)) problems.push(`column ${table}.${column} is missing`);
     }
     // The vec0 table is described by its definition, which needs no sqlite-vec to read.
-    const vec = this.stmt(`SELECT sql FROM sqlite_master WHERE type='table' AND name='${VEC_TABLE}'`).get() as { sql: string } | undefined;
-    if (vec && !(/collection_id\s+INTEGER\s+PARTITION KEY/i.test(vec.sql) && /embedding\s+float\[\d+\]/i.test(vec.sql))) {
+    const vec = this.stmt(
+      `SELECT sql FROM sqlite_master WHERE type='table' AND name='${VEC_TABLE}'`,
+    ).get() as { sql: string } | undefined;
+    if (
+      vec &&
+      !(
+        /collection_id\s+INTEGER\s+PARTITION KEY/i.test(vec.sql) &&
+        /embedding\s+float\[\d+\]/i.test(vec.sql)
+      )
+    ) {
       problems.push(`${VEC_TABLE} is not partitioned by collection_id with an embedding column`);
     }
     return problems;
@@ -146,12 +163,16 @@ export class QmdReader {
 
   hasVectors(): boolean {
     if (!this.vecLoaded) return false;
-    return !!this.stmt(`SELECT name FROM sqlite_master WHERE type='table' AND name='${VEC_TABLE}'`).get();
+    return !!this.stmt(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='${VEC_TABLE}'`,
+    ).get();
   }
 
   /** Embedding dimensions, read from the vec0 table definition. */
   dims(): number | null {
-    const row = this.stmt(`SELECT sql FROM sqlite_master WHERE type='table' AND name='${VEC_TABLE}'`).get() as { sql: string } | undefined;
+    const row = this.stmt(
+      `SELECT sql FROM sqlite_master WHERE type='table' AND name='${VEC_TABLE}'`,
+    ).get() as { sql: string } | undefined;
     const m = row ? /float\[(\d+)\]/.exec(row.sql) : null;
     return m ? Number(m[1]) : null;
   }
@@ -171,7 +192,9 @@ export class QmdReader {
   }
 
   content(hash: string): string | null {
-    const row = this.stmt(`SELECT doc FROM content WHERE hash = ?`).get(hash) as { doc: string } | undefined;
+    const row = this.stmt(`SELECT doc FROM content WHERE hash = ?`).get(hash) as
+      | { doc: string }
+      | undefined;
     return row ? row.doc : null;
   }
 
@@ -194,7 +217,11 @@ export class QmdReader {
   }
 
   counts(collection: string): { sources: number; embedded: number } {
-    const sources = (this.stmt(`SELECT COUNT(*) AS n FROM documents WHERE collection = ? AND active = 1`).get(collection) as { n: number }).n;
+    const sources = (
+      this.stmt(`SELECT COUNT(*) AS n FROM documents WHERE collection = ? AND active = 1`).get(
+        collection,
+      ) as { n: number }
+    ).n;
     const embedded = (
       this.stmt(
         `SELECT COUNT(*) AS n FROM documents d WHERE d.collection = ? AND d.active = 1 AND EXISTS (SELECT 1 FROM content_vectors cv WHERE cv.hash = d.hash)`,
@@ -205,7 +232,9 @@ export class QmdReader {
 
   /** Model ids that stored vectors were made with, most common first. */
   vectorModels(): { model: string; chunks: number }[] {
-    return this.stmt(`SELECT model, COUNT(*) AS chunks FROM content_vectors GROUP BY model ORDER BY chunks DESC`).all() as {
+    return this.stmt(
+      `SELECT model, COUNT(*) AS chunks FROM content_vectors GROUP BY model ORDER BY chunks DESC`,
+    ).all() as {
       model: string;
       chunks: number;
     }[];
@@ -224,7 +253,10 @@ export class QmdReader {
       WHERE documents_fts MATCH ? AND d.active = 1 AND d.collection IN (${this.placeholders(collections.length)})
       ORDER BY score LIMIT ?`;
     try {
-      return (this.db.prepare(sql).all(match, ...collections, limit) as LexRow[]).map((r) => ({ ...r, score: -r.score }));
+      return (this.db.prepare(sql).all(match, ...collections, limit) as LexRow[]).map((r) => ({
+        ...r,
+        score: -r.score,
+      }));
     } catch (err) {
       // A term the tokenizer cannot handle makes FTS5 throw a syntax error; treat it as no match.
       if (String((err as Error).message).includes("fts5")) return [];
@@ -237,7 +269,9 @@ export class QmdReader {
     const tokens = ftsTokens(word);
     if (tokens.length === 0) return true;
     try {
-      return !!this.stmt(`SELECT rowid FROM documents_fts WHERE documents_fts MATCH ? LIMIT 1`).get(`"${tokens.join(" ")}"*`);
+      return !!this.stmt(`SELECT rowid FROM documents_fts WHERE documents_fts MATCH ? LIMIT 1`).get(
+        `"${tokens.join(" ")}"*`,
+      );
     } catch {
       return true;
     }
@@ -246,7 +280,9 @@ export class QmdReader {
   /** The FTS vocabulary with document counts, read through an fts5vocab table. */
   vocabulary(): VocabEntry[] {
     if (!this.vocabReady) {
-      this.db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS temp.trova_vocab USING fts5vocab('main', 'documents_fts', 'row')`);
+      this.db.exec(
+        `CREATE VIRTUAL TABLE IF NOT EXISTS temp.trova_vocab USING fts5vocab('main', 'documents_fts', 'row')`,
+      );
       this.vocabReady = true;
     }
     return this.stmt(`SELECT term, doc AS docs FROM temp.trova_vocab`).all() as VocabEntry[];
@@ -255,7 +291,9 @@ export class QmdReader {
   // ---------- vectors ----------
 
   chunks(hash: string): ChunkRow[] {
-    return this.stmt(`SELECT hash, seq, pos FROM content_vectors WHERE hash = ? ORDER BY seq`).all(hash) as ChunkRow[];
+    return this.stmt(`SELECT hash, seq, pos FROM content_vectors WHERE hash = ? ORDER BY seq`).all(
+      hash,
+    ) as ChunkRow[];
   }
 
   chunksFor(hashes: string[]): Map<string, ChunkRow[]> {
@@ -263,7 +301,9 @@ export class QmdReader {
     for (let i = 0; i < hashes.length; i += 400) {
       const part = hashes.slice(i, i + 400);
       const rows = this.db
-        .prepare(`SELECT hash, seq, pos FROM content_vectors WHERE hash IN (${this.placeholders(part.length)}) ORDER BY hash, seq`)
+        .prepare(
+          `SELECT hash, seq, pos FROM content_vectors WHERE hash IN (${this.placeholders(part.length)}) ORDER BY hash, seq`,
+        )
         .all(...part) as ChunkRow[];
       for (const r of rows) {
         const list = out.get(r.hash);
@@ -292,7 +332,9 @@ export class QmdReader {
     const vectorOf = this.stmt(`SELECT embedding FROM ${VEC_TABLE} WHERE rowid = ?`);
     for (let i = 0; i < hashes.length; i += 400) {
       const part = hashes.slice(i, i + 400);
-      const rows = this.stmt(`SELECT MIN(id) AS id, hash, seq FROM vector_rows WHERE hash IN (${this.placeholders(part.length)}) GROUP BY hash, seq`).all(...part) as {
+      const rows = this.stmt(
+        `SELECT MIN(id) AS id, hash, seq FROM vector_rows WHERE hash IN (${this.placeholders(part.length)}) GROUP BY hash, seq`,
+      ).all(...part) as {
         id: number;
         hash: string;
         seq: number;
@@ -312,25 +354,37 @@ export class QmdReader {
    * or in all of them. Each collection is scanned on its own, as qmd does, so a small collection is
    * never crowded out by a large one; a chunk held by several collections counts once.
    */
-  knn(vector: Float32Array, k: number, collections?: string[]): { hash: string; seq: number; similarity: number }[] {
+  knn(
+    vector: Float32Array,
+    k: number,
+    collections?: string[],
+  ): { hash: string; seq: number; similarity: number }[] {
     if (!this.hasVectors()) return [];
     const ids = collections
       ? collections.length === 0
         ? []
-        : (this.stmt(`SELECT id FROM vector_collection_ids WHERE name IN (${this.placeholders(collections.length)})`).all(...collections) as { id: number }[])
+        : (this.stmt(
+            `SELECT id FROM vector_collection_ids WHERE name IN (${this.placeholders(collections.length)})`,
+          ).all(...collections) as { id: number }[])
       : (this.stmt(`SELECT id FROM vector_collection_ids`).all() as { id: number }[]);
     const embedding = Buffer.from(vector.buffer, vector.byteOffset, vector.byteLength);
     const kk = Math.max(1, Math.min(MAX_K, Math.floor(k)));
-    const scan = this.stmt(`SELECT rowid, distance FROM ${VEC_TABLE} WHERE embedding MATCH ? AND k = ? AND collection_id = ?`);
+    const scan = this.stmt(
+      `SELECT rowid, distance FROM ${VEC_TABLE} WHERE embedding MATCH ? AND k = ? AND collection_id = ?`,
+    );
     const chunkOf = this.stmt(`SELECT hash, seq FROM vector_rows WHERE id = ?`);
     const best = new Map<string, { hash: string; seq: number; similarity: number }>();
     for (const { id } of ids) {
-      for (const r of scan.all(embedding, kk, BigInt(id)) as { rowid: number; distance: number }[]) {
+      for (const r of scan.all(embedding, kk, BigInt(id)) as {
+        rowid: number;
+        distance: number;
+      }[]) {
         const chunk = chunkOf.get(r.rowid) as { hash: string; seq: number } | undefined;
         if (!chunk) continue;
         const key = `${chunk.hash}_${chunk.seq}`;
         const similarity = 1 - r.distance;
-        if ((best.get(key)?.similarity ?? -Infinity) < similarity) best.set(key, { hash: chunk.hash, seq: chunk.seq, similarity });
+        if ((best.get(key)?.similarity ?? -Infinity) < similarity)
+          best.set(key, { hash: chunk.hash, seq: chunk.seq, similarity });
       }
     }
     return [...best.values()].sort((a, b) => b.similarity - a.similarity).slice(0, kk);

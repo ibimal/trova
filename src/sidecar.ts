@@ -53,7 +53,9 @@ export function parseFrontmatter(text: string): Record<string, unknown> {
   if (!raw) return {};
   try {
     const value = parseYaml(raw) as unknown;
-    return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
   } catch {
     return {};
   }
@@ -69,7 +71,11 @@ export function buildMeta(
   const path = publicPath(qmdCollection, qmdPath);
   const isNote = extname(path) === "md";
   const fm = isNote ? parseFrontmatter(text) : {};
-  const tags = new Set([...normaliseTags(fm["tags"]), ...normaliseTags(fm["tag"]), ...(isNote ? extractInlineTags(text) : [])]);
+  const tags = new Set([
+    ...normaliseTags(fm["tags"]),
+    ...normaliseTags(fm["tag"]),
+    ...(isNote ? extractInlineTags(text) : []),
+  ]);
   const fmExcluded = isExcludedByFrontmatter(fm);
   return {
     path,
@@ -140,23 +146,36 @@ export class Sidecar {
   private db: Database.Database;
   private metas = new Map<string, Map<string, MetaEntry>>();
   private graphs = new Map<string, CollectionGraph>();
-  private options = new Map<string, { path: string; options: CollectionOptions; lastIndexed?: number }>();
+  private options = new Map<
+    string,
+    { path: string; options: CollectionOptions; lastIndexed?: number }
+  >();
 
   constructor(dbPath: string) {
     this.db = new Database(dbPath);
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("busy_timeout = 5000");
     this.db.exec(SCHEMA);
-    for (const row of this.db.prepare(`SELECT name, path, options, last_indexed FROM trova_collections`).all() as {
+    for (const row of this.db
+      .prepare(`SELECT name, path, options, last_indexed FROM trova_collections`)
+      .all() as {
       name: string;
       path: string;
       options: string;
       last_indexed: number | null;
     }[]) {
-      this.options.set(row.name, { path: row.path, options: JSON.parse(row.options) as CollectionOptions, lastIndexed: row.last_indexed ?? undefined });
+      this.options.set(row.name, {
+        path: row.path,
+        options: JSON.parse(row.options) as CollectionOptions,
+        lastIndexed: row.last_indexed ?? undefined,
+      });
     }
     // A job that was running when the process stopped can never finish.
-    this.db.prepare(`UPDATE trova_jobs SET state = 'failed', error = 'engine stopped' WHERE state IN ('running', 'queued', 'paused')`).run();
+    this.db
+      .prepare(
+        `UPDATE trova_jobs SET state = 'failed', error = 'engine stopped' WHERE state IN ('running', 'queued', 'paused')`,
+      )
+      .run();
   }
 
   close(): void {
@@ -169,7 +188,9 @@ export class Sidecar {
     return [...this.options.keys()];
   }
 
-  collection(name: string): { path: string; options: CollectionOptions; lastIndexed?: number } | undefined {
+  collection(
+    name: string,
+  ): { path: string; options: CollectionOptions; lastIndexed?: number } | undefined {
     return this.options.get(name);
   }
 
@@ -177,7 +198,9 @@ export class Sidecar {
     const prev = this.options.get(name);
     this.options.set(name, { path, options, lastIndexed: prev?.lastIndexed });
     this.db
-      .prepare(`INSERT INTO trova_collections (name, path, options) VALUES (?, ?, ?) ON CONFLICT(name) DO UPDATE SET path = excluded.path, options = excluded.options`)
+      .prepare(
+        `INSERT INTO trova_collections (name, path, options) VALUES (?, ?, ?) ON CONFLICT(name) DO UPDATE SET path = excluded.path, options = excluded.options`,
+      )
       .run(name, path, JSON.stringify(options));
     this.applyScope(name);
   }
@@ -195,7 +218,9 @@ export class Sidecar {
     // An exact prefix: LIKE would treat "_" in the name as a wildcard and ignore letter case.
     const prefix = `${name}:`;
     this.db.prepare(`DELETE FROM trova_collections WHERE name = ?`).run(name);
-    this.db.prepare(`DELETE FROM trova_blocks WHERE substr(source_id, 1, ?) = ?`).run(prefix.length, prefix);
+    this.db
+      .prepare(`DELETE FROM trova_blocks WHERE substr(source_id, 1, ?) = ?`)
+      .run(prefix.length, prefix);
     this.db.prepare(`DELETE FROM trova_meta WHERE collection = ?`).run(name);
     this.db.prepare(`DELETE FROM trova_attachments WHERE collection = ?`).run(name);
   }
@@ -206,14 +231,17 @@ export class Sidecar {
     const opts = this.options.get(collection)?.options;
     const map = this.metas.get(collection);
     if (!map) return;
-    for (const e of map.values()) e.excluded = e.fmExcluded || !inScope(e.path, opts?.include, opts?.exclude);
+    for (const e of map.values())
+      e.excluded = e.fmExcluded || !inScope(e.path, opts?.include, opts?.exclude);
   }
 
   entries(collection: string): Map<string, MetaEntry> {
     let map = this.metas.get(collection);
     if (map) return map;
     map = new Map();
-    const rows = this.db.prepare(`SELECT * FROM trova_meta WHERE collection = ?`).all(collection) as MetaRow[];
+    const rows = this.db
+      .prepare(`SELECT * FROM trova_meta WHERE collection = ?`)
+      .all(collection) as MetaRow[];
     for (const r of rows) {
       const path = r.source_id.slice(collection.length + 1);
       map.set(path, {
@@ -245,7 +273,11 @@ export class Sidecar {
   }
 
   /** Writes changed sources and removes deleted ones in one transaction. */
-  apply(collection: string, upserts: { entry: MetaEntry; blocks: Block[] }[], removals: string[]): void {
+  apply(
+    collection: string,
+    upserts: { entry: MetaEntry; blocks: Block[] }[],
+    removals: string[],
+  ): void {
     const map = this.entries(collection);
     const putMeta = this.db.prepare(
       `INSERT OR REPLACE INTO trova_meta (source_id, collection, hash, title, aliases, tags, links, frontmatter, created, modified, word_count, excluded, qmd_collection, qmd_path, oversized)
@@ -277,7 +309,16 @@ export class Sidecar {
           entry.oversized ? 1 : 0,
         );
         delBlocks.run(id);
-        for (const b of blocks) putBlock.run(`${id}#${b.headingPath}`, id, b.headingPath, JSON.stringify(b.headings), b.level, b.start, b.end);
+        for (const b of blocks)
+          putBlock.run(
+            `${id}#${b.headingPath}`,
+            id,
+            b.headingPath,
+            JSON.stringify(b.headings),
+            b.level,
+            b.start,
+            b.end,
+          );
         map.set(entry.path, entry);
       }
       for (const path of removals) {
@@ -293,9 +334,23 @@ export class Sidecar {
 
   blocks(source: string): Block[] {
     const rows = this.db
-      .prepare(`SELECT heading_path, headings, level, start, end FROM trova_blocks WHERE source_id = ? ORDER BY start`)
-      .all(source) as { heading_path: string; headings: string; level: number; start: number; end: number }[];
-    return rows.map((r) => ({ headingPath: r.heading_path, headings: JSON.parse(r.headings) as string[], level: r.level, start: r.start, end: r.end }));
+      .prepare(
+        `SELECT heading_path, headings, level, start, end FROM trova_blocks WHERE source_id = ? ORDER BY start`,
+      )
+      .all(source) as {
+      heading_path: string;
+      headings: string;
+      level: number;
+      start: number;
+      end: number;
+    }[];
+    return rows.map((r) => ({
+      headingPath: r.heading_path,
+      headings: JSON.parse(r.headings) as string[],
+      level: r.level,
+      start: r.start,
+      end: r.end,
+    }));
   }
 
   /** The link graph of a collection. Resolved links are written onto each entry. */
@@ -328,13 +383,17 @@ export class Sidecar {
   // ---------- renames ----------
 
   recordRename(oldId: string, newId: string): void {
-    this.db.prepare(`INSERT INTO trova_paths (old_id, new_id, at) VALUES (?, ?, ?)`).run(oldId, newId, Date.now());
+    this.db
+      .prepare(`INSERT INTO trova_paths (old_id, new_id, at) VALUES (?, ?, ?)`)
+      .run(oldId, newId, Date.now());
   }
 
   /** Follows the rename history from an old source id to its current id. */
   currentId(sourceId: string): string {
     let id = sourceId;
-    const stmt = this.db.prepare(`SELECT new_id FROM trova_paths WHERE old_id = ? ORDER BY at DESC, rowid DESC LIMIT 1`);
+    const stmt = this.db.prepare(
+      `SELECT new_id FROM trova_paths WHERE old_id = ? ORDER BY at DESC, rowid DESC LIMIT 1`,
+    );
     for (let i = 0; i < 20; i++) {
       const row = stmt.get(id) as { new_id: string } | undefined;
       if (!row || row.new_id === id) break;
@@ -344,48 +403,83 @@ export class Sidecar {
   }
 
   renameHistory(): { old_id: string; new_id: string; at: number }[] {
-    return this.db.prepare(`SELECT old_id, new_id, at FROM trova_paths ORDER BY at`).all() as { old_id: string; new_id: string; at: number }[];
+    return this.db.prepare(`SELECT old_id, new_id, at FROM trova_paths ORDER BY at`).all() as {
+      old_id: string;
+      new_id: string;
+      at: number;
+    }[];
   }
 
   // ---------- jobs ----------
 
   saveJob(job: JobInfo): void {
     this.db
-      .prepare(`INSERT OR REPLACE INTO trova_jobs (job_id, kind, state, done, total, error, started, finished) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(job.jobId, job.kind, job.state, job.done, job.total, job.error ?? null, job.started ?? null, job.finished ?? null);
+      .prepare(
+        `INSERT OR REPLACE INTO trova_jobs (job_id, kind, state, done, total, error, started, finished) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        job.jobId,
+        job.kind,
+        job.state,
+        job.done,
+        job.total,
+        job.error ?? null,
+        job.started ?? null,
+        job.finished ?? null,
+      );
   }
 
   // ---------- attachments ----------
 
-  attachmentManifest(collection: string): Map<string, { mtime: number; size: number; pushed: boolean }> {
-    const rows = this.db.prepare(`SELECT path, mtime, size, pushed FROM trova_attachments WHERE collection = ?`).all(collection) as {
+  attachmentManifest(
+    collection: string,
+  ): Map<string, { mtime: number; size: number; pushed: boolean }> {
+    const rows = this.db
+      .prepare(`SELECT path, mtime, size, pushed FROM trova_attachments WHERE collection = ?`)
+      .all(collection) as {
       path: string;
       mtime: number;
       size: number;
       pushed: number;
     }[];
-    return new Map(rows.map((r) => [r.path, { mtime: r.mtime, size: r.size, pushed: r.pushed === 1 }]));
+    return new Map(
+      rows.map((r) => [r.path, { mtime: r.mtime, size: r.size, pushed: r.pushed === 1 }]),
+    );
   }
 
-  putAttachment(collection: string, path: string, mtime: number, size: number, pushed: boolean): void {
+  putAttachment(
+    collection: string,
+    path: string,
+    mtime: number,
+    size: number,
+    pushed: boolean,
+  ): void {
     this.db
-      .prepare(`INSERT OR REPLACE INTO trova_attachments (collection, path, mtime, size, pushed) VALUES (?, ?, ?, ?, ?)`)
+      .prepare(
+        `INSERT OR REPLACE INTO trova_attachments (collection, path, mtime, size, pushed) VALUES (?, ?, ?, ?, ?)`,
+      )
       .run(collection, path, Math.round(mtime), size, pushed ? 1 : 0);
   }
 
   removeAttachment(collection: string, path: string): void {
-    this.db.prepare(`DELETE FROM trova_attachments WHERE collection = ? AND path = ?`).run(collection, path);
+    this.db
+      .prepare(`DELETE FROM trova_attachments WHERE collection = ? AND path = ?`)
+      .run(collection, path);
   }
 
   // ---------- key-value ----------
 
   getValue<T>(key: string): T | null {
-    const row = this.db.prepare(`SELECT value FROM trova_kv WHERE key = ?`).get(key) as { value: string } | undefined;
+    const row = this.db.prepare(`SELECT value FROM trova_kv WHERE key = ?`).get(key) as
+      | { value: string }
+      | undefined;
     return row ? (JSON.parse(row.value) as T) : null;
   }
 
   setValue(key: string, value: unknown): void {
-    this.db.prepare(`INSERT OR REPLACE INTO trova_kv (key, value) VALUES (?, ?)`).run(key, JSON.stringify(value));
+    this.db
+      .prepare(`INSERT OR REPLACE INTO trova_kv (key, value) VALUES (?, ?)`)
+      .run(key, JSON.stringify(value));
   }
 }
 

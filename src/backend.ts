@@ -170,7 +170,10 @@ export class QmdBackend {
 
   // ---------- indexing ----------
 
-  async update(collections: string[], onProgress?: (done: number, total: number) => void): Promise<void> {
+  async update(
+    collections: string[],
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<void> {
     if (collections.length === 0) return;
     await this.store.update({ collections, onProgress: (p) => onProgress?.(p.current, p.total) });
   }
@@ -180,11 +183,16 @@ export class QmdBackend {
    * `shouldStop` turns true (the job was paused or cancelled) the run stops: the vectors written so
    * far are kept, and the remaining documents stay pending.
    */
-  async embedPending(onProgress?: (done: number, total: number) => void, shouldStop?: () => boolean): Promise<number> {
+  async embedPending(
+    onProgress?: (done: number, total: number) => void,
+    shouldStop?: () => boolean,
+  ): Promise<number> {
     const embedder = this.opts.embedder;
     if (!embedder) {
       const controller = new AbortController();
-      const poll = shouldStop ? setInterval(() => shouldStop() && controller.abort(), STOP_POLL_MS) : null;
+      const poll = shouldStop
+        ? setInterval(() => shouldStop() && controller.abort(), STOP_POLL_MS)
+        : null;
       let embedded = 0;
       const run = (force: boolean) =>
         this.store.embed({
@@ -199,7 +207,8 @@ export class QmdBackend {
       try {
         const result = await run(false).catch((err: Error) => {
           // Vectors from a model with other dimensions: replace them all.
-          if (!controller.signal.aborted && /dimension mismatch/i.test(err.message)) return run(true);
+          if (!controller.signal.aborted && /dimension mismatch/i.test(err.message))
+            return run(true);
           throw err;
         });
         return result.chunksEmbedded;
@@ -227,7 +236,16 @@ export class QmdBackend {
       const parts = chunkText(row.body);
       for (let seq = 0; seq < parts.length; seq++) {
         const vec = await embedder.embed(parts[seq]!.text, false);
-        internal.insertEmbedding(row.hash, seq, parts[seq]!.pos, vec, embedder.id, new Date().toISOString(), parts.length, "");
+        internal.insertEmbedding(
+          row.hash,
+          seq,
+          parts[seq]!.pos,
+          vec,
+          embedder.id,
+          new Date().toISOString(),
+          parts.length,
+          "",
+        );
         chunks++;
       }
       onProgress?.(++done, rows.length);
@@ -262,7 +280,9 @@ export class QmdBackend {
     if (!uri) return 0;
     if (!uri.startsWith("hf:")) return existsSync(uri) ? statSync(uri).size : 0;
     const file = uri.split("/").pop()!;
-    const dir = this.llm?.DEFAULT_MODEL_CACHE_DIR ?? join(process.env.XDG_CACHE_HOME || join(process.env.HOME ?? "", ".cache"), "qmd", "models");
+    const dir =
+      this.llm?.DEFAULT_MODEL_CACHE_DIR ??
+      join(process.env.XDG_CACHE_HOME || join(process.env.HOME ?? "", ".cache"), "qmd", "models");
     try {
       return readdirSync(dir)
         .filter((name) => name.includes(file) && !name.endsWith(".etag"))
@@ -272,7 +292,11 @@ export class QmdBackend {
     }
   }
 
-  private fileState(uri: string, kind: "embed" | "deep", expected: number): { state: ModelState; progress?: number } {
+  private fileState(
+    uri: string,
+    kind: "embed" | "deep",
+    expected: number,
+  ): { state: ModelState; progress?: number } {
     const bytes = this.cachedBytes(uri);
     if (this.downloading.has(kind) && bytes < expected * 0.9) {
       return { state: "downloading", progress: Math.min(0.99, bytes / expected) };
@@ -287,15 +311,28 @@ export class QmdBackend {
   } {
     if (this.opts.embedder) {
       const deep: ModelState = this.opts.deep ? "ready" : "missing";
-      return { embed: { id: this.opts.embedder.id, state: "ready" }, rerank: { state: deep }, expand: { state: deep } };
+      return {
+        embed: { id: this.opts.embedder.id, state: "ready" },
+        rerank: { state: deep },
+        expand: { state: deep },
+      };
     }
     const llm = this.store.internal.llm;
     const rerankUri = llm?.rerankModelName ?? "";
     const expandUri = llm?.generateModelName ?? "";
     return {
-      embed: { id: this.embedModelId(), ...this.fileState(this.embedModelUri(), "embed", EMBED_MODEL_BYTES) },
-      rerank: { id: modelIdFromUri(rerankUri), ...this.fileState(rerankUri, "deep", DEEP_MODEL_BYTES / 3) },
-      expand: { id: modelIdFromUri(expandUri), ...this.fileState(expandUri, "deep", (DEEP_MODEL_BYTES * 2) / 3) },
+      embed: {
+        id: this.embedModelId(),
+        ...this.fileState(this.embedModelUri(), "embed", EMBED_MODEL_BYTES),
+      },
+      rerank: {
+        id: modelIdFromUri(rerankUri),
+        ...this.fileState(rerankUri, "deep", DEEP_MODEL_BYTES / 3),
+      },
+      expand: {
+        id: modelIdFromUri(expandUri),
+        ...this.fileState(expandUri, "deep", (DEEP_MODEL_BYTES * 2) / 3),
+      },
     };
   }
 
@@ -326,7 +363,9 @@ export class QmdBackend {
     if (!llm) return null;
     const mod = await this.llmModule();
     const uri = llm.embedModelName;
-    const formatted = isQuery ? mod.formatQueryForEmbedding(text, uri) : mod.formatDocForEmbedding(text, undefined, uri);
+    const formatted = isQuery
+      ? mod.formatQueryForEmbedding(text, uri)
+      : mod.formatDocForEmbedding(text, undefined, uri);
     const result = await llm.embed(formatted, { model: uri, isQuery });
     return result ? new Float32Array(result.embedding) : null;
   }
@@ -348,6 +387,7 @@ export class QmdBackend {
   /** Touches the models so qmd does not unload them while Obsidian is focused. */
   async keepWarm(): Promise<void> {
     if (this.opts.embedder) return;
-    if (this.modelStates().embed.state === "ready") await this.embedText("warm", true).catch(() => null);
+    if (this.modelStates().embed.state === "ready")
+      await this.embedText("warm", true).catch(() => null);
   }
 }
