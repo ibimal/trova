@@ -1,6 +1,6 @@
 import { renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { API_VERSION, EngineError, type EngineEvent, type ResultBatch } from "../src/contract/index.js";
 import { startServer, type RunningServer } from "../src/server.js";
 import { fakeDeep } from "../src/testing.js";

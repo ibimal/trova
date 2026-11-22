@@ -6,7 +6,7 @@ import Database from "better-sqlite3";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { qmdDist } from "../src/backend.js";
 import { Engine } from "../src/engine.js";
 import { hashEmbedder } from "../src/testing.js";

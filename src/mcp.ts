@@ -14,6 +14,9 @@ const str = { type: "string" } as const;
 const collections = { type: "array", items: str, description: "Collection names to search. Default: all." } as const;
 const limit = { type: "number", description: "Maximum number of results. Default 10." } as const;
 
+/** A tool argument as text; anything that is not a string becomes "". */
+const text = (v: unknown): string => (typeof v === "string" ? v : "");
+
 export const MCP_TOOLS = [
   {
     name: "search",
@@ -101,7 +104,7 @@ export async function callTool(trova: Trova, name: string, args: Record<string, 
       return formatResults([...best.values()].sort((a, b) => a.rank - b.rank).slice(0, max).map((b) => b.result));
     }
     case "ask": {
-      const query = parseQuery(String(args["question"] ?? ""), { mode: "ask" }).query;
+      const query = parseQuery(text(args["question"]), { mode: "ask" }).query;
       const batch = await lastBatch(trova.stream("/v1/ask", { query, mode: args["mode"] ?? "auto", collections: cols, limit: max }));
       return formatResults(batch?.results ?? []);
     }
@@ -109,7 +112,7 @@ export async function callTool(trova: Trova, name: string, args: Record<string, 
       let anchor: Record<string, string>;
       if (typeof args["text"] === "string" && args["text"]) anchor = { text: args["text"] };
       else {
-        const doc = await trova.json<DocumentBody>("POST", "/v1/documents/get", { id: String(args["path"] ?? "") });
+        const doc = await trova.json<DocumentBody>("POST", "/v1/documents/get", { id: text(args["path"]) });
         anchor = doc.block ? { block: doc.id } : { source: doc.id };
       }
       const res = await trova.json<RelatedResponse>("POST", "/v1/related", { anchor, limit: max, collections: cols, granularity: "both" });

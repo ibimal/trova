@@ -1,7 +1,7 @@
 import { chmodSync, existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { EngineError, blockId, sourceId } from "../src/contract/index.js";
 import { isLoopbackRequest } from "../src/mcp.js";
 import { dataPaths, writeDaemonInfo } from "../src/paths.js";

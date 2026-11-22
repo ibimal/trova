@@ -91,6 +91,9 @@ import { ENGINE_NAME, ENGINE_VERSION, dataPaths, type DataPaths } from "./paths.
 import { QmdReader, buildFtsQuery } from "./reader.js";
 import { ATT_SUFFIX, Sidecar, buildMeta, publicPath, splitBlocks, type MetaEntry } from "./sidecar.js";
 
+/** Orders strings by their UTF-16 code units, as the default sort does, but states it. */
+const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
 export interface EngineOptions {
   home?: string;
   embedder?: Embedder;
@@ -1155,7 +1158,7 @@ export class Engine {
         }
       }
       candidates.sort((x, y) => y.similarity - x.similarity);
-      const degree = new Array<number>(nodes.length).fill(0);
+      const degree = Array.from({ length: nodes.length }, () => 0);
       for (const c of candidates) {
         if (degree[c.i]! >= GRAPH_EDGES_PER_NODE || degree[c.j]! >= GRAPH_EDGES_PER_NODE) continue;
         degree[c.i]!++;
@@ -1194,7 +1197,7 @@ export class Engine {
         }
       }
     }
-    return { keys: Object.fromEntries([...keys.entries()].sort().map(([k, v]) => [k, [...v].sort()])) };
+    return { keys: Object.fromEntries([...keys.entries()].sort(([a], [b]) => compareText(a, b)).map(([k, v]) => [k, [...v].sort(compareText)])) };
   }
 
   // ---------- documents ----------
