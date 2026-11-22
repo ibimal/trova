@@ -104,6 +104,20 @@ qmd downloads its default models from Hugging Face into `~/.cache/qmd/models/` t
 | Index, sidecar tables, logs, attachment text | `~/.cache/trova/`, or the folder in `TROVA_HOME` |
 | Models | qmd's model cache, `~/.cache/qmd/models/` |
 
+## Update and uninstall
+
+Update to the latest release:
+
+```bash
+npm install -g trova-cli@latest
+```
+
+To uninstall, remove the package, then delete the index in `~/.cache/trova/` (or the folder in `TROVA_HOME`). The models are in qmd's model cache, `~/.cache/qmd/models/`; delete them too, unless you also use qmd itself, which shares that folder.
+
+```bash
+npm uninstall -g trova-cli
+```
+
 ## Acknowledgements
 
 `trova` is built on [qmd](https://github.com/tobi/qmd) by Tobi Lütke, which does the indexing, the keyword and vector search, and the model handling. qmd is MIT-licensed and installs as a dependency. `trova` adds the block-level index, related notes, typo rescue, the daemon, the HTTP API and the MCP server on top of it.
