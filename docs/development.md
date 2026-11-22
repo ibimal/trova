@@ -43,6 +43,14 @@ npm link
 
 `trova eval` runs the evaluation on the fixture vault with a stand-in embedder; `trova eval --real` uses the real models; `trova eval --perf` measures the engine-side latency budgets on a generated 10,000-note vault. GitHub Actions run the check, the tests and the build on every push.
 
+## Updating Vite+
+
+Vite+ pins the versions of the tools it bundles; `npx vp toolchain` lists them. The Obsidian plugin formats with Oxfmt on its own, at the same version, so the contract copies keep one layout. When you update `vite-plus`:
+
+1. Run `npx vp toolchain` and note the `oxfmt` version.
+2. In the plugin, set `oxfmt` to that exact version and run `npm run format`.
+3. Run `npm run format` here, and check that `src/contract/` is still identical in both repositories.
+
 ## Release
 
 1. Set the new version in `package.json`. The CLI and `/health` read it from there.
