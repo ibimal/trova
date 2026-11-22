@@ -35,7 +35,7 @@ import {
   typoMaxEdits,
   vaultCollectionName,
   type SourceMeta,
-} from "../src/index.js";
+} from "../src/contract/index.js";
 
 const NOW = new Date(2026, 10, 16, 12).getTime();
 const p = (raw: string, extra = {}) => parseQuery(raw, { now: NOW, ...extra });

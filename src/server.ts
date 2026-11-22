@@ -5,7 +5,7 @@ import { appendFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
-import { API_VERSION, ERROR_STATUS, EngineError, type ErrorBody, type ResultBatch } from "@trova/contract";
+import { API_VERSION, ERROR_STATUS, EngineError, type ErrorBody, type ResultBatch } from "./contract/index.js";
 import type { Engine } from "./engine.js";
 import { ENGINE_NAME, ENGINE_VERSION } from "./paths.js";
 import { dispatch } from "./routes.js";

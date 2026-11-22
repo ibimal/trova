@@ -2,10 +2,10 @@ import { chmodSync, existsSync, mkdtempSync, rmSync, statSync, writeFileSync } f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { EngineError, blockId, sourceId } from "@trova/contract";
+import { EngineError, blockId, sourceId } from "../src/contract/index.js";
 import { isLoopbackRequest } from "../src/mcp.js";
 import { dataPaths, writeDaemonInfo } from "../src/paths.js";
-import { writeFixtureVault } from "../../eval/src/fixture.js";
+import { writeFixtureVault } from "../src/eval/fixture.js";
 import { Engine } from "../src/engine.js";
 import { fakeDeep, hashEmbedder } from "../src/testing.js";
 import { COLLECTION, makeEnv, type TestEnv } from "./helpers.js";

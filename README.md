@@ -1,76 +1,131 @@
 # Trova
 
-Trova is local keyword and semantic search for folders of Markdown notes. The `trova` command indexes a folder on your machine and searches it by keyword, by meaning, or both. It also serves the index over an HTTP API and to AI agents over MCP. It is built on [qmd](https://github.com/tobi/qmd). Your notes never leave the machine: the only network traffic is the model download from Hugging Face. The models have their own licences, listed in [`packages/engine/README.md`](packages/engine/README.md#models); the default embedding model, EmbeddingGemma, is under Google's Gemma Terms of Use.
+Local keyword and semantic search for folders of Markdown notes. The `trova` command (npm package `trova-cli`) indexes a folder on your machine and searches it by keyword, by meaning, or both. It runs as a command-line tool, an HTTP API and an MCP server for AI agents. It is built on [qmd](https://github.com/tobi/qmd). Your notes never leave the machine: the only network traffic is the model download from Hugging Face, and after that `trova` works offline.
+
+The same engine powers the Trova plugin for Obsidian, which lives in its own repository, [trova-obsidian](https://github.com/ibimal/trova-obsidian).
+
+## Requirements
+
+- Node 22 or later; Node 24 is the verified version. On Node 22.12.0 the prebuilt `better-sqlite3` binary crashes, so `trova` stops with a message there; `npm rebuild better-sqlite3 --build-from-source` in the package folder may fix it.
+- Checked on macOS on Apple Silicon. Other platforms are not tested yet.
+
+## Install
 
 ```bash
 npm install -g trova-cli
 ```
 
+The installed package takes about 300 MB, mostly llama.cpp binaries; the models come on top (see below).
+
+npm 11 does not run the install scripts of dependencies unless you allow them, and it lists the ones it skipped: `node-llama-cpp` and some `tree-sitter` packages. On macOS with Apple Silicon `trova` works without them, because the prebuilt binaries are used. On other platforms `node-llama-cpp` may need its script; this is not tested.
+
+Then check the setup:
+
+```bash
+trova doctor
+```
+
+## Quick start
+
+Add a folder as a collection. `trova` indexes and embeds it; the first run downloads qmd's embedding model, about 330 MB.
+
 ```bash
 trova collection add ~/Notes
+```
+
+Search it:
+
+```bash
+trova search "chunk size"
 ```
 
 ```bash
 trova query "how did we choose the chunk size?"
 ```
 
-[`packages/engine/README.md`](packages/engine/README.md) documents the command-line tool, the daemon, MCP and where data lives; it is also the package's page on npm. The Obsidian plugin that uses this engine lives in its own repository, [trova-obsidian](https://github.com/ibimal/trova-obsidian).
+`search` is the keyword lane. When a query finds fewer than 3 notes, it corrects misspelt words of 5 letters or more: one edit, or two for words of 9 letters or more. `vsearch` is the vector lane. `query` (alias `ask`) fuses both. `query --mode deep` also expands the query and reranks the results with two larger models, about 1.7 GB together. The command line cannot download them yet; until they are on disk, Deep queries run in Fast mode and say so.
 
-This repository implements a written features and API specification that is not published here. "Deviations from the spec" below records where the engine differs from it, and `docs/spikes.md` records what was checked before and during the build.
+`trova related <path>` lists the notes closest to one note, and `trova related <path>#<heading>` the blocks closest to one section.
 
-## Layout
+## Commands
 
-| Package | Contents |
+| Command | What it does |
 | --- | --- |
-| `packages/contract` | Types for the `/v1` API, the query parser, ranking constants, block and id rules. No runtime dependencies. The Obsidian plugin keeps a copy. |
-| `packages/engine` | `trova-cli`: CLI, HTTP server, qmd adapter, sidecar database, watcher, jobs, MCP server. |
-| `packages/eval` | The fixture vault generator and the evaluation harness behind `trova eval`. |
+| `collection add <path> [--name <name>]` | Add a folder as a collection and index it |
+| `collection ls`, `collection rm <name>`, `collection rename <old> <new>` | List, remove or rename collections |
+| `context add <collection> <path> <text>`, `context ls`, `context rm <collection> <path>` | Describe a folder to improve ranking |
+| `update [-c <collection>]` | Rescan collections for changes |
+| `embed` | Embed new and changed blocks |
+| `search`, `vsearch`, `query <query> [--mode fast\|deep]` | Keyword, vector and hybrid search |
+| `related <path>[#heading-path]` | Related sources and blocks |
+| `get <id\|path>`, `multi-get <glob \| id,id,...>` | Print one source, or several |
+| `status`, `doctor` | Health, counts and model identity |
+| `watch [--port <n>]` | Run the daemon: watcher, indexer and HTTP API |
+| `serve [--port <n>]` | HTTP API only, no watcher |
+| `mcp [--http] [--port <n>]` | MCP server over stdio, or over HTTP on 127.0.0.1 |
+| `eval` | nDCG@10 and Recall@20 on a fixture vault or your own queries |
 
-## Requirements
+Every command takes `--json`, `-n`/`--limit <n>` and `-c`/`--collection <name>`. `trova help` prints the full list.
 
-- Node 22 or later; Node 24 is the verified version. On Node 22.12.0 the prebuilt `better-sqlite3` binary crashes, so `trova` stops with a message there; `npm rebuild better-sqlite3 --build-from-source` may fix it. `trova doctor` checks this.
+## The daemon
 
-## Build and test
+`trova watch` runs one daemon per machine. It keeps the models loaded, watches the collections for changes and serves the HTTP API on 127.0.0.1 only. Every request needs the token it writes to `daemon.json` in its data folder, which only your user account can read. Other commands use a running daemon when there is one and otherwise run in-process. The daemon stops by itself after 30 minutes with no client and no job.
 
-```bash
-npm install
+## Use it from an AI agent (MCP)
+
+`trova mcp` serves the index over stdio with the tools `search`, `ask`, `related`, `get`, `multi_get`, `status` and `metadata`. For a client that reads an `mcpServers` configuration:
+
+```json
+{
+  "mcpServers": {
+    "trova": { "command": "trova", "args": ["mcp"] }
+  }
+}
 ```
 
-```bash
-npm run build
-```
+`trova mcp --http` serves the same tools at `http://127.0.0.1:8181/mcp`. That server has no token: it refuses any request whose `Host` or `Origin` is not a loopback address, so web pages cannot reach it, but any program on this machine can. Start it only while you use it.
+
+## Models
+
+qmd downloads its default models from Hugging Face into `~/.cache/qmd/models/` the first time they are needed. Each model has its own licence, and by downloading it you accept that licence:
+
+| Model | Used for | Size | Licence |
+| --- | --- | --- | --- |
+| [EmbeddingGemma 300M](https://huggingface.co/google/embeddinggemma-300m) (GGUF build by [ggml-org](https://huggingface.co/ggml-org/embeddinggemma-300M-GGUF)) | Embeddings: vector search and related notes | about 330 MB | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) and the [Gemma Prohibited Use Policy](https://ai.google.dev/gemma/prohibited_use_policy) |
+| [Qwen3-Reranker 0.6B](https://huggingface.co/Qwen/Qwen3-Reranker-0.6B) | Deep mode: reranking | about 1.7 GB together with the next model | Apache-2.0 |
+| [qmd-query-expansion 1.7B](https://huggingface.co/tobil/qmd-query-expansion-1.7B-gguf) | Deep mode: query expansion | | MIT |
+
+`trova` does not include or redistribute any model.
+
+## Where data lives
+
+| Data | Location |
+| --- | --- |
+| Index, sidecar tables, logs, attachment text | `~/.cache/trova/`, or the folder in `TROVA_HOME` |
+| Models | qmd's model cache, `~/.cache/qmd/models/` |
+
+## Update and uninstall
+
+Update to the latest release:
 
 ```bash
-npm test
+npm install -g trova-cli@latest
 ```
+
+To uninstall, remove the package, then delete the index in `~/.cache/trova/` (or the folder in `TROVA_HOME`). The models are in qmd's model cache, `~/.cache/qmd/models/`; delete them too, unless you also use qmd itself, which shares that folder.
 
 ```bash
-npm run typecheck
+npm uninstall -g trova-cli
 ```
 
-To run the `trova` command from this checkout instead of the published package:
+## Development
 
-```bash
-npm link -w packages/engine
-```
+[`docs/development.md`](docs/development.md) covers the layout, building, testing and releasing. [`docs/notes.md`](docs/notes.md) records where the engine differs from its specification, and [`docs/spikes.md`](docs/spikes.md) what was checked during the build.
 
-`trova eval` runs the evaluation on the fixture vault with a stand-in embedder; `trova eval --real` uses the real models; `trova eval --perf` measures the engine-side latency budgets on a generated 10,000-note vault.
+## Acknowledgements
 
-## Deviations from the spec
-
-Each of these is a decision made during the build. `docs/spikes.md` gives the evidence. The plugin's own deviations are recorded in its repository.
-
-- **Expansions in Deep mode.** The spec puts `expansions` on the first batch. The engine sends them on the `rerank` batch, because the keyword batch is sent before the expansion model has run.
-- **Ask keyword pass.** When the all-words query finds fewer than 3 notes, Ask also takes notes that match any content word. A natural-language question rarely has every word in one note.
-- **Extra endpoints.** `POST /v1/attachments/text` (OCR text pushed by the plugin), `/v1/duplicates`, `/v1/topics`, `/v1/graph` (the similarity graph around one note), `/v1/models/download`, `/v1/index/pause`, `/v1/index/resume`, `/v1/keepalive`, `/v1/debug`.
-- **Typo rescue vocabulary.** FTS5 stores stems. A stem within the allowed edits of a prefix of the typed word counts as a correction.
-- **Notes over 2 MB.** qmd indexes a markdown note whole. Such notes are flagged in the status popover but not cut. Attachment text is cut at 2 MB.
-
-## Not built
-
-- Phase 4: the Rust engine and its WebAssembly build.
-- Baseline recordings of Smart Connections, Smart Lookup and Omnisearch, and a query set from a real vault. `trova eval --queries <file>` accepts one.
+`trova` is built on [qmd](https://github.com/tobi/qmd) by Tobi Lütke, which does the indexing, the keyword and vector search, and the model handling. qmd is MIT-licensed and installs as a dependency. `trova` adds the block-level index, related notes, typo rescue, the daemon, the HTTP API and the MCP server on top of it.
 
 ## Licence
 
-MIT; see `LICENSE`. Search and indexing come from [qmd](https://github.com/tobi/qmd) by Tobi Lütke (MIT), a dependency. No code is copied from qmd, Smart Connections or Omnisearch.
+`trova` is MIT-licensed; see `LICENSE`. The models have their own licences; see "Models" above. No code is copied from qmd, Smart Connections or Omnisearch.

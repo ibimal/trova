@@ -2,7 +2,7 @@
 // Connections, and latency percentiles for the engine-side rows of the Budgets table.
 
 import { readFileSync } from "node:fs";
-import { ndcg, parseQuery, recallAt, type RelatedResponse, type Result, type ResultBatch } from "@trova/contract";
+import { ndcg, parseQuery, recallAt, type RelatedResponse, type Result, type ResultBatch } from "../contract/index.js";
 import type { EvalQuery } from "./fixture.js";
 
 export * from "./fixture.js";

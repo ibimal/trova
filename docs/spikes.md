@@ -4,7 +4,7 @@ The specification (not published in this repository) listed four items to verify
 
 ## 1. A second read-only connection can query qmd's vector table
 
-**Confirmed.** `packages/engine/src/reader.ts` opens `qmd.sqlite` with `better-sqlite3` in read-only mode and loads `sqlite-vec`. It runs nearest-neighbour queries (`embedding MATCH ? AND k = ?`) and reads stored vectors while qmd's own connection has the database open and writes to it. The engine tests cover this on every run: they index, embed and query in one process.
+**Confirmed.** `src/reader.ts` opens `qmd.sqlite` with `better-sqlite3` in read-only mode and loads `sqlite-vec`. It runs nearest-neighbour queries (`embedding MATCH ? AND k = ?`) and reads stored vectors while qmd's own connection has the database open and writes to it. The engine tests cover this on every run: they index, embed and query in one process.
 
 Two details matter:
 

@@ -79,7 +79,7 @@ import {
   type GraphNode,
   type GraphRequest,
   type GraphResponse,
-} from "@trova/contract";
+} from "./contract/index.js";
 import { findDuplicates, findTopics } from "./analysis.js";
 
 /** How many edges to other related sources one source keeps in the similarity graph. */

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { DaemonInfo } from "@trova/contract";
+import type { DaemonInfo } from "./contract/index.js";
 import pkg from "../package.json" with { type: "json" };
 
 export const ENGINE_NAME = "trova";

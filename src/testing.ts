@@ -1,7 +1,7 @@
 // Deterministic stand-ins for the models, used by tests and by `trova eval --perf`. They need no
 // download and give stable vectors: texts that share words get a high cosine similarity.
 
-import { lightStem, type Lane } from "@trova/contract";
+import { lightStem, type Lane } from "./contract/index.js";
 import type { DeepModels, Embedder } from "./backend.js";
 
 const STOP = new Set("the a an and or of to in is it for on with as at by be this that are was from".split(" "));

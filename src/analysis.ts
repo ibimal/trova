@@ -15,7 +15,7 @@ import {
   type Block,
   type DuplicatePair,
   type TopicCluster,
-} from "@trova/contract";
+} from "./contract/index.js";
 import type { JobCtx } from "./jobs.js";
 import type { ChunkRow, QmdReader } from "./reader.js";
 import { publicPath, type MetaEntry } from "./sidecar.js";

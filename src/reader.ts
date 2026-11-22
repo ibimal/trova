@@ -11,7 +11,7 @@
 
 import Database from "better-sqlite3";
 import * as sqliteVec from "sqlite-vec";
-import { QMD_BM25_WEIGHTS, type ParsedQuery, type Term, type VocabEntry } from "@trova/contract";
+import { QMD_BM25_WEIGHTS, type ParsedQuery, type Term, type VocabEntry } from "./contract/index.js";
 
 export interface DocRow {
   id: number;

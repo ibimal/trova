@@ -2,7 +2,7 @@
 // copy of the models is loaded; otherwise in-process.
 
 import { spawn } from "node:child_process";
-import { EngineError, type ErrorBody, type ResultBatch } from "@trova/contract";
+import { EngineError, type ErrorBody, type ResultBatch } from "./contract/index.js";
 import { Engine } from "./engine.js";
 import { trovaHome, readDaemonInfo } from "./paths.js";
 import { dispatch } from "./routes.js";

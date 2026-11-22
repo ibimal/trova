@@ -23,7 +23,7 @@ import {
   type JobInfo,
   type LinkResolver,
   type SourceMeta,
-} from "@trova/contract";
+} from "./contract/index.js";
 
 export interface MetaEntry extends SourceMeta {
   hash: string;

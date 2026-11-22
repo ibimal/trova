@@ -1,7 +1,7 @@
 // Transport-neutral routing for the /v1 contract. The HTTP server and the in-process client of
 // the CLI both call `dispatch`, so a command behaves the same with or without a running daemon.
 
-import { EngineError, type ResultBatch } from "@trova/contract";
+import { EngineError, type ResultBatch } from "./contract/index.js";
 import type { Engine } from "./engine.js";
 
 export type Dispatched =

@@ -1,7 +1,7 @@
 // Background jobs: one runs at a time, at the lowest priority. A job waits between units of work
 // while an interactive request is in flight or indexing is paused.
 
-import type { EngineEvent, JobInfo, JobKind } from "@trova/contract";
+import type { EngineEvent, JobInfo, JobKind } from "./contract/index.js";
 import type { Sidecar } from "./sidecar.js";
 
 export interface JobCtx {

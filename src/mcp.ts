@@ -6,7 +6,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { parseQuery, type DocumentBody, type Filter, type RelatedResponse, type Result, type ResultBatch } from "@trova/contract";
+import { parseQuery, type DocumentBody, type Filter, type RelatedResponse, type Result, type ResultBatch } from "./contract/index.js";
 import type { Trova } from "./client.js";
 import { ENGINE_VERSION } from "./paths.js";
 

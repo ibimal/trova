@@ -1,8 +1,8 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseQuery, type ResultBatch } from "@trova/contract";
-import { writeFixtureVault, type Fixture } from "../../eval/src/fixture.js";
+import { parseQuery, type ResultBatch } from "../src/contract/index.js";
+import { writeFixtureVault, type Fixture } from "../src/eval/fixture.js";
 import { Engine, type EngineOptions } from "../src/engine.js";
 import { fakeDeep, hashEmbedder } from "../src/testing.js";
 

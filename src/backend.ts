@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createStore, type QMDStore } from "@tobilu/qmd";
-import type { Lane, ModelState } from "@trova/contract";
+import type { Lane, ModelState } from "./contract/index.js";
 
 export interface Embedder {
   id: string;

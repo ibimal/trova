@@ -2,7 +2,7 @@
 // the /v1 contract, and exits by itself after 30 minutes with no connected client and no job.
 
 import { randomBytes } from "node:crypto";
-import { API_VERSION } from "@trova/contract";
+import { API_VERSION } from "./contract/index.js";
 import { Engine, type EngineOptions } from "./engine.js";
 import { ENGINE_VERSION, isProcessAlive, trovaHome, readDaemonInfo, removeDaemonInfo, writeDaemonInfo } from "./paths.js";
 import { startServer, type RunningServer } from "./server.js";

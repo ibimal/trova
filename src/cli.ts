@@ -14,8 +14,8 @@ import {
   type RelatedResponse,
   type Result,
   type ResultBatch,
-} from "@trova/contract";
-import { TOPICS, loadQueries, runEval, runPerf, writeFixtureVault, writeGeneratedVault } from "../../eval/src/index.js";
+} from "./contract/index.js";
+import { TOPICS, loadQueries, runEval, runPerf, writeFixtureVault, writeGeneratedVault } from "./eval/index.js";
 import { connect, connectOrStartDaemon, localTrova, type Trova } from "./client.js";
 import { DaemonRunningError, startDaemon } from "./daemon.js";
 import { Engine } from "./engine.js";

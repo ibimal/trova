@@ -4,7 +4,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { EngineError, extname, inScope, MAX_TEXT_BYTES, type CollectionOptions } from "@trova/contract";
+import { EngineError, extname, inScope, MAX_TEXT_BYTES, type CollectionOptions } from "./contract/index.js";
 import type { Sidecar } from "./sidecar.js";
 
 export const DEFAULT_ATTACHMENTS = ["pdf", "canvas", "image"];
