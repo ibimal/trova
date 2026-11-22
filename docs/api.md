@@ -18,7 +18,7 @@ Trova has three public interfaces. Each one is versioned on its own, so the engi
 
 ## The contract copy
 
-The Obsidian plugin keeps a copy of `src/contract/` at the same path, with the same `test/contract.test.ts`. Keep the two identical. An API change therefore goes through these steps:
+The Obsidian plugin keeps a copy of `src/contract/` at the same path, with the same `test/contract.test.ts`. Keep the two identical; the contract test differs only in its test import (`vite-plus/test` here, `vitest` in the plugin). Both repositories format with Oxfmt 0.79.0, so the copies keep one layout. An API change therefore goes through these steps:
 
 1. Change `src/contract/` here, and set `API_VERSION`: the next minor for an addition, the next major (with `/v2` paths) for a breaking change.
 2. Implement it in the engine, with tests.
