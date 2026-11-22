@@ -276,8 +276,14 @@ async function doctor(args: Args): Promise<void> {
 export async function main(argv: string[]): Promise<void> {
   const [command, ...rest] = argv;
   const args = parseArgs(rest);
-  if (!command || command === "help" || command === "--help" || args.flags["help"]) return void console.log(HELP);
-  if (command === "--version" || command === "version") return void console.log(ENGINE_VERSION);
+  if (!command || command === "help" || command === "--help" || args.flags["help"]) {
+    console.log(HELP);
+    return;
+  }
+  if (command === "--version" || command === "version") {
+    console.log(ENGINE_VERSION);
+    return;
+  }
   if (command === "doctor") return doctor(args);
   requireSqlite();
   if (command === "watch") return runDaemon(args, true);

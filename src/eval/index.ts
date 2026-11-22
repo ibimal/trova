@@ -73,7 +73,7 @@ export async function runEval(client: EvalClient, queries: EvalQuery[], collecti
     g.values.push(p.value);
     groups.set(key, g);
   }
-  const rows = [...groups.entries()].sort().map(([group, g]) => ({
+  const rows = [...groups.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([group, g]) => ({
     group,
     metric: g.metric,
     queries: g.values.length,
