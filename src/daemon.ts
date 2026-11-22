@@ -4,7 +4,14 @@
 import { randomBytes } from "node:crypto";
 import { API_VERSION } from "./contract/index.js";
 import { Engine, type EngineOptions } from "./engine.js";
-import { ENGINE_VERSION, isProcessAlive, trovaHome, readDaemonInfo, removeDaemonInfo, writeDaemonInfo } from "./paths.js";
+import {
+  ENGINE_VERSION,
+  isProcessAlive,
+  trovaHome,
+  readDaemonInfo,
+  removeDaemonInfo,
+  writeDaemonInfo,
+} from "./paths.js";
 import { startServer, type RunningServer } from "./server.js";
 
 export const IDLE_EXIT_MS = 30 * 60 * 1000;
@@ -25,14 +32,19 @@ export interface Daemon {
 }
 
 export class DaemonRunningError extends Error {
-  constructor(public pid: number, public port: number) {
+  constructor(
+    public pid: number,
+    public port: number,
+  ) {
     super(`A trova daemon is already running (pid ${pid}, port ${port})`);
   }
 }
 
 async function healthy(port: number): Promise<boolean> {
   try {
-    const res = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(1000) });
+    const res = await fetch(`http://127.0.0.1:${port}/health`, {
+      signal: AbortSignal.timeout(1000),
+    });
     return res.ok;
   } catch {
     return false;
@@ -42,13 +54,25 @@ async function healthy(port: number): Promise<boolean> {
 export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
   const home = opts.home ?? trovaHome();
   const existing = readDaemonInfo(home);
-  if (existing && existing.pid !== process.pid && isProcessAlive(existing.pid) && (await healthy(existing.port))) {
+  if (
+    existing &&
+    existing.pid !== process.pid &&
+    isProcessAlive(existing.pid) &&
+    (await healthy(existing.port))
+  ) {
     throw new DaemonRunningError(existing.pid, existing.port);
   }
   const engine = await Engine.open({ ...opts, home });
   const token = randomBytes(24).toString("hex");
-  const server = await startServer(engine, { token, port: opts.port, debug: opts.debug ?? process.env.TROVA_DEBUG === "1" });
-  writeDaemonInfo({ pid: process.pid, port: server.port, token, version: ENGINE_VERSION, api: API_VERSION }, home);
+  const server = await startServer(engine, {
+    token,
+    port: opts.port,
+    debug: opts.debug ?? process.env.TROVA_DEBUG === "1",
+  });
+  writeDaemonInfo(
+    { pid: process.pid, port: server.port, token, version: ENGINE_VERSION, api: API_VERSION },
+    home,
+  );
 
   let stopped = false;
   const stop = async () => {

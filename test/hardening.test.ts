@@ -57,16 +57,26 @@ describe("engine input checks", () => {
 
   it("refuses pushed image text whose path leaves the collection", () => {
     for (const path of ["../../escape.png", "/tmp/escape.png", "a/../../escape.png"]) {
-      expect(() => env.engine.attachmentText({ collection: COLLECTION, path, text: "text" })).toThrow(EngineError);
+      expect(() =>
+        env.engine.attachmentText({ collection: COLLECTION, path, text: "text" }),
+      ).toThrow(EngineError);
     }
     expect(existsSync(join(env.home, "escape.png.md"))).toBe(false);
     expect(existsSync(join(env.home, "attachments", "escape.png.md"))).toBe(false);
-    expect(() => env.engine.attachmentText({ collection: COLLECTION, path: "Images/ok.png", text: "text" })).not.toThrow();
+    expect(() =>
+      env.engine.attachmentText({ collection: COLLECTION, path: "Images/ok.png", text: "text" }),
+    ).not.toThrow();
   });
 
   it("removing a collection leaves another whose name differs only by _ or letter case", async () => {
-    const sidecar = (env.engine as unknown as { sidecar: { blocks(source: string): unknown[]; entries(c: string): Map<string, unknown> } }).sidecar;
-    const path = [...sidecar.entries(COLLECTION).keys()].find((p) => sidecar.blocks(sourceId(COLLECTION, p)).length > 0)!;
+    const sidecar = (
+      env.engine as unknown as {
+        sidecar: { blocks(source: string): unknown[]; entries(c: string): Map<string, unknown> };
+      }
+    ).sidecar;
+    const path = [...sidecar.entries(COLLECTION).keys()].find(
+      (p) => sidecar.blocks(sourceId(COLLECTION, p)).length > 0,
+    )!;
     const source = sourceId(COLLECTION, path);
     const before = sidecar.blocks(source).length;
     expect(before).toBeGreaterThan(0);
@@ -77,7 +87,11 @@ describe("engine input checks", () => {
       await env.engine.removeCollection(name);
     }
     expect(sidecar.blocks(source).length).toBe(before);
-    expect(() => env.engine.get({ id: blockId(source, (sidecar.blocks(source)[0] as { headingPath: string }).headingPath) })).not.toThrow();
+    expect(() =>
+      env.engine.get({
+        id: blockId(source, (sidecar.blocks(source)[0] as { headingPath: string }).headingPath),
+      }),
+    ).not.toThrow();
   });
 });
 
@@ -87,11 +101,17 @@ describe("removing a collection after a restart", () => {
     const att = join(env.home, "attachments", COLLECTION);
     expect(existsSync(att)).toBe(true);
     await env.engine.close();
-    const engine = await Engine.open({ home: env.home, embedder: hashEmbedder(), deep: fakeDeep() });
+    const engine = await Engine.open({
+      home: env.home,
+      embedder: hashEmbedder(),
+      deep: fakeDeep(),
+    });
     try {
       await engine.removeCollection(COLLECTION);
       const backend = (engine as unknown as { backend: QmdBackend }).backend;
-      expect((await backend.listCollections()).map((c) => c.name)).not.toContain(`${COLLECTION}-att`);
+      expect((await backend.listCollections()).map((c) => c.name)).not.toContain(
+        `${COLLECTION}-att`,
+      );
       expect(existsSync(att)).toBe(false);
     } finally {
       await engine.close();
@@ -104,7 +124,11 @@ describe("vectors partitioned by collection", () => {
   let env: TestEnv;
   const SMALL = "kitchen";
   type Reader = {
-    knn(v: Float32Array, k: number, collections?: string[]): { hash: string; seq: number; similarity: number }[];
+    knn(
+      v: Float32Array,
+      k: number,
+      collections?: string[],
+    ): { hash: string; seq: number; similarity: number }[];
     vectors(keys: string[]): Map<string, Float32Array>;
     docsByHashes(hashes: string[]): Map<string, { collection: string }[]>;
   };
@@ -112,7 +136,11 @@ describe("vectors partitioned by collection", () => {
   beforeAll(async () => {
     env = await makeEnv();
     // A second collection over one folder of the vault: its notes are in both collections.
-    await env.engine.addCollection({ name: SMALL, path: join(env.vault, "Kitchen"), options: { kind: "folder" } });
+    await env.engine.addCollection({
+      name: SMALL,
+      path: join(env.vault, "Kitchen"),
+      options: { kind: "folder" },
+    });
     env.engine.sync({ collection: SMALL, full: true });
     await env.engine.drain();
   });
@@ -121,9 +149,13 @@ describe("vectors partitioned by collection", () => {
   });
 
   const kitchenVector = () => {
-    const entries = (env.engine as unknown as { sidecar: { entries(c: string): Map<string, { hash: string }> } }).sidecar.entries(SMALL);
+    const entries = (
+      env.engine as unknown as { sidecar: { entries(c: string): Map<string, { hash: string }> } }
+    ).sidecar.entries(SMALL);
     const hash = [...entries.values()][0]!.hash;
-    const vector = reader().vectors([`${hash}_0`]).get(`${hash}_0`);
+    const vector = reader()
+      .vectors([`${hash}_0`])
+      .get(`${hash}_0`);
     expect(vector).toBeDefined();
     return vector!;
   };
@@ -144,9 +176,15 @@ describe("vectors partitioned by collection", () => {
   });
 
   it("related notes in the small collection are not crowded out by the vault", async () => {
-    const entries = (env.engine as unknown as { sidecar: { entries(c: string): Map<string, { path: string }> } }).sidecar.entries(SMALL);
+    const entries = (
+      env.engine as unknown as { sidecar: { entries(c: string): Map<string, { path: string }> } }
+    ).sidecar.entries(SMALL);
     const path = [...entries.values()][0]!.path;
-    const res = await env.engine.related({ anchor: { source: sourceId(SMALL, path) }, collections: [SMALL], limit: 10 });
+    const res = await env.engine.related({
+      anchor: { source: sourceId(SMALL, path) },
+      collections: [SMALL],
+      limit: 10,
+    });
     expect(res.anchorIndexed).toBe(true);
     expect(res.results.length).toBeGreaterThan(0);
     expect(res.results.every((r) => r.collection === SMALL)).toBe(true);
@@ -158,17 +196,33 @@ describe("pausing indexing", () => {
     const root = mkdtempSync(join(tmpdir(), "trova-pause-"));
     const fast = hashEmbedder();
     // A slow embedder, so the run is still going when it is paused.
-    const embedder = { ...fast, embed: async (text: string, isQuery: boolean) => (await new Promise((r) => setTimeout(r, 4)), fast.embed(text, isQuery)) };
+    const embedder = {
+      ...fast,
+      embed: async (text: string, isQuery: boolean) => (
+        await new Promise((r) => setTimeout(r, 4)),
+        fast.embed(text, isQuery)
+      ),
+    };
     const engine = await Engine.open({ home: join(root, "home"), embedder, deep: fakeDeep() });
     try {
       writeFixtureVault(join(root, "vault"));
-      await engine.addCollection({ name: COLLECTION, path: join(root, "vault"), options: { kind: "vault" } });
+      await engine.addCollection({
+        name: COLLECTION,
+        path: join(root, "vault"),
+        options: { kind: "vault" },
+      });
       const ready: number[] = [];
       engine.on((e) => e.event === "index.ready" && ready.push(Date.now()));
       engine.sync({ collection: COLLECTION, full: true });
-      const backend = (engine as unknown as { backend: { pendingEmbeddings(): Promise<number> } }).backend;
+      const backend = (engine as unknown as { backend: { pendingEmbeddings(): Promise<number> } })
+        .backend;
       // Wait until embedding is under way, then pause.
-      for (let i = 0; i < 400 && !engine.jobs.active().some((j) => j.kind === "embed" && j.done > 5); i++) await new Promise((r) => setTimeout(r, 10));
+      for (
+        let i = 0;
+        i < 400 && !engine.jobs.active().some((j) => j.kind === "embed" && j.done > 5);
+        i++
+      )
+        await new Promise((r) => setTimeout(r, 10));
       engine.pause();
       await new Promise((r) => setTimeout(r, 300));
       const waiting = await backend.pendingEmbeddings();

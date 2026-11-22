@@ -14,7 +14,12 @@ import { makeEnv, type TestEnv } from "./helpers.js";
 
 interface Internal {
   db: unknown;
-  llm?: { embedModelName: unknown; rerankModelName: unknown; generateModelName: unknown; embed: unknown };
+  llm?: {
+    embedModelName: unknown;
+    rerankModelName: unknown;
+    generateModelName: unknown;
+    embed: unknown;
+  };
   rerank: unknown;
   insertEmbedding: unknown;
   ensureVecTable: unknown;
@@ -22,7 +27,14 @@ interface Internal {
 
 describe("qmd contract", () => {
   let env: TestEnv;
-  const store = () => (env.engine as unknown as { backend: { store: { internal: Internal; getStatus(): Promise<{ needsEmbedding: unknown }> } } }).backend.store;
+  const store = () =>
+    (
+      env.engine as unknown as {
+        backend: {
+          store: { internal: Internal; getStatus(): Promise<{ needsEmbedding: unknown }> };
+        };
+      }
+    ).backend.store;
   beforeAll(async () => {
     env = await makeEnv();
   });
@@ -31,7 +43,9 @@ describe("qmd contract", () => {
   });
 
   it("the index has every table and column the reader queries", () => {
-    const reader = (env.engine as unknown as { reader: { schemaProblems(): string[]; hasVectors(): boolean } }).reader;
+    const reader = (
+      env.engine as unknown as { reader: { schemaProblems(): string[]; hasVectors(): boolean } }
+    ).reader;
     expect(reader.hasVectors()).toBe(true);
     expect(reader.schemaProblems()).toEqual([]);
   });
@@ -43,7 +57,8 @@ describe("qmd contract", () => {
     expect(typeof internal.insertEmbedding).toBe("function");
     expect(typeof internal.ensureVecTable).toBe("function");
     const llm = internal.llm!;
-    for (const name of [llm.embedModelName, llm.rerankModelName, llm.generateModelName]) expect(typeof name === "string" && name.length > 0).toBe(true);
+    for (const name of [llm.embedModelName, llm.rerankModelName, llm.generateModelName])
+      expect(typeof name === "string" && name.length > 0).toBe(true);
     expect(typeof llm.embed).toBe("function");
   });
 
@@ -52,7 +67,10 @@ describe("qmd contract", () => {
   });
 
   it("llm.js exports the embedding formats, the model download and the model folder", async () => {
-    const llm = (await import(pathToFileURL(join(qmdDist(), "llm.js")).href)) as Record<string, unknown>;
+    const llm = (await import(pathToFileURL(join(qmdDist(), "llm.js")).href)) as Record<
+      string,
+      unknown
+    >;
     expect(typeof llm["formatQueryForEmbedding"]).toBe("function");
     expect(typeof llm["formatDocForEmbedding"]).toBe("function");
     expect(typeof llm["pullModels"]).toBe("function");
@@ -60,7 +78,9 @@ describe("qmd contract", () => {
   });
 
   it("qmd still reports a change of vector size as a dimension mismatch, which the backend retries with force", () => {
-    expect(readFileSync(join(qmdDist(), "store.js"), "utf8")).toMatch(/Embedding dimension mismatch/);
+    expect(readFileSync(join(qmdDist(), "store.js"), "utf8")).toMatch(
+      /Embedding dimension mismatch/,
+    );
   });
 
   // Last, because it changes the shared test index. qmd recreates a missing table when it opens an
@@ -69,6 +89,8 @@ describe("qmd contract", () => {
     const db = new Database(join(env.home, "qmd.sqlite"));
     db.exec("ALTER TABLE content_vectors DROP COLUMN pos");
     db.close();
-    await expect(Engine.open({ home: env.home, embedder: hashEmbedder() })).rejects.toThrow(/column content_vectors\.pos is missing/);
+    await expect(Engine.open({ home: env.home, embedder: hashEmbedder() })).rejects.toThrow(
+      /column content_vectors\.pos is missing/,
+    );
   });
 });

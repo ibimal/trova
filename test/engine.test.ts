@@ -1,7 +1,12 @@
 import { renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
-import { API_VERSION, EngineError, type EngineEvent, type ResultBatch } from "../src/contract/index.js";
+import {
+  API_VERSION,
+  EngineError,
+  type EngineEvent,
+  type ResultBatch,
+} from "../src/contract/index.js";
 import { startServer, type RunningServer } from "../src/server.js";
 import { fakeDeep } from "../src/testing.js";
 import { COLLECTION, collect, makeEnv, q, type TestEnv } from "./helpers.js";
@@ -14,7 +19,12 @@ beforeAll(async () => {
 }, 120000);
 afterAll(() => env.cleanup());
 
-const lex = async (raw: string, extra = {}) => (await collect(env.engine.search({ query: q(raw), lanes: ["lex"], collections: [COLLECTION], ...extra })))[0]!;
+const lex = async (raw: string, extra = {}) =>
+  (
+    await collect(
+      env.engine.search({ query: q(raw), lanes: ["lex"], collections: [COLLECTION], ...extra }),
+    )
+  )[0]!;
 const paths = (b: ResultBatch) => b.results.map((r) => r.path);
 
 describe("index and status", () => {
@@ -27,7 +37,17 @@ describe("index and status", () => {
     expect(c.sources).toBe(env.fixture.notes.length);
     expect(c.embedded).toBe(c.sources);
     expect(c.pending).toBe(0);
-    expect(s.capabilities).toEqual(expect.arrayContaining(["lex", "vec", "fuzzy", "relatedByVector", "blocks", "rerank", "expansion"]));
+    expect(s.capabilities).toEqual(
+      expect.arrayContaining([
+        "lex",
+        "vec",
+        "fuzzy",
+        "relatedByVector",
+        "blocks",
+        "rerank",
+        "expansion",
+      ]),
+    );
     expect(s.models.embed.dims).toBe(96);
     expect(s.jobs).toEqual([]);
   });
@@ -67,7 +87,9 @@ describe("search, lex lane", () => {
     expect(paths(await lex("kanata path:Tools"))).toEqual(["Tools/Kanata.md"]);
     expect(paths(await lex("kanata tag:#keyboard"))).toEqual(["Tools/Kanata.md"]);
     expect(paths(await lex("kanata ext:canvas"))).toEqual(["Board.canvas"]);
-    expect(paths(await lex("plan status:active rating:>3 path:Projects"))).toEqual(["Projects/Trova/Plan.md"]);
+    expect(paths(await lex("plan status:active rating:>3 path:Projects"))).toEqual([
+      "Projects/Trova/Plan.md",
+    ]);
     expect(paths(await lex("kanata links:[[Trova]]"))).toEqual(["Tools/Kanata.md"]);
     expect(paths(await lex("harbour is:orphan"))).toEqual(["Orphan.md"]);
     expect(paths(await lex("kanata is:orphan"))).not.toContain("Tools/Kanata.md");
@@ -109,28 +131,54 @@ describe("search, lex lane", () => {
 
 describe("search, vec lane and streaming", () => {
   it("streams lex then vec, with final on the last line only", async () => {
-    const batches = await collect(env.engine.search({ query: q("tomato compost seedling"), lanes: ["lex", "vec"], collections: [COLLECTION] }));
-    expect(batches.map((b) => [b.stage, b.final])).toEqual([["lex", false], ["vec", true]]);
+    const batches = await collect(
+      env.engine.search({
+        query: q("tomato compost seedling"),
+        lanes: ["lex", "vec"],
+        collections: [COLLECTION],
+      }),
+    );
+    expect(batches.map((b) => [b.stage, b.final])).toEqual([
+      ["lex", false],
+      ["vec", true],
+    ]);
     expect(batches[1]!.results[0]!.path.startsWith("Garden/")).toBe(true);
     expect(batches[1]!.results[0]!.matchedBy).toEqual(["vec"]);
     expect(batches[1]!.results[0]!.scores.vec).toBeGreaterThan(0.3);
   });
   it("hybrid emits lex then fused", async () => {
-    const batches = await collect(env.engine.search({ query: q("sourdough starter"), lanes: ["hybrid"], collections: [COLLECTION] }));
+    const batches = await collect(
+      env.engine.search({
+        query: q("sourdough starter"),
+        lanes: ["hybrid"],
+        collections: [COLLECTION],
+      }),
+    );
     expect(batches.map((b) => b.stage)).toEqual(["lex", "fused"]);
     expect(batches[1]!.results[0]!.scores.fused).toBeGreaterThan(0);
   });
   it("a lane prefix runs only that lane, and filters apply to it", async () => {
-    const batches = await collect(env.engine.search({ query: q("vec: marathon taper mileage path:Health"), lanes: ["lex", "vec"], collections: [COLLECTION] }));
+    const batches = await collect(
+      env.engine.search({
+        query: q("vec: marathon taper mileage path:Health"),
+        lanes: ["lex", "vec"],
+        collections: [COLLECTION],
+      }),
+    );
     expect(batches.map((b) => b.stage)).toEqual(["vec"]);
     expect(batches[0]!.results.every((r) => r.path.startsWith("Health/"))).toBe(true);
   });
   it("rejects a malformed query", async () => {
-    await expect(collect(env.engine.search({ query: {} as never, lanes: ["lex"] }))).rejects.toMatchObject({ code: "bad_request" });
+    await expect(
+      collect(env.engine.search({ query: {} as never, lanes: ["lex"] })),
+    ).rejects.toMatchObject({ code: "bad_request" });
   });
   it("stops when the client aborts", async () => {
     const controller = new AbortController();
-    const gen = env.engine.search({ query: q("tomato"), lanes: ["lex", "vec"], collections: [COLLECTION] }, controller.signal);
+    const gen = env.engine.search(
+      { query: q("tomato"), lanes: ["lex", "vec"], collections: [COLLECTION] },
+      controller.signal,
+    );
     await gen.next();
     controller.abort();
     await expect(gen.next()).rejects.toMatchObject({ code: "cancelled" });
@@ -139,14 +187,30 @@ describe("search, vec lane and streaming", () => {
 
 describe("ask", () => {
   it("Fast streams lex then fused", async () => {
-    const batches = await collect(env.engine.ask({ query: q("? telescope nebula"), mode: "fast", collections: [COLLECTION] }));
-    expect(batches.map((b) => [b.stage, b.final])).toEqual([["lex", false], ["fused", true]]);
+    const batches = await collect(
+      env.engine.ask({ query: q("? telescope nebula"), mode: "fast", collections: [COLLECTION] }),
+    );
+    expect(batches.map((b) => [b.stage, b.final])).toEqual([
+      ["lex", false],
+      ["fused", true],
+    ]);
     expect(batches[1]!.mode).toBe("fast");
     expect(batches[1]!.results.length).toBeLessThanOrEqual(20);
-    expect(batches[1]!.results.slice(0, 4).map((r) => r.label)).toEqual(["strong", "strong", "strong", "related"]);
+    expect(batches[1]!.results.slice(0, 4).map((r) => r.label)).toEqual([
+      "strong",
+      "strong",
+      "strong",
+      "related",
+    ]);
   });
   it("Deep streams three stages, with expansions and rerank scores", async () => {
-    const batches = await collect(env.engine.ask({ query: q("? what did I decide about chunk size"), mode: "auto", collections: [COLLECTION] }));
+    const batches = await collect(
+      env.engine.ask({
+        query: q("? what did I decide about chunk size"),
+        mode: "auto",
+        collections: [COLLECTION],
+      }),
+    );
     expect(batches.map((b) => b.stage)).toEqual(["lex", "fused", "rerank"]);
     const last = batches[2]!;
     expect(last.final).toBe(true);
@@ -158,13 +222,22 @@ describe("ask", () => {
     expect(last.results[0]!.matchedBy).toContain("rerank");
   });
   it("Auto picks Fast for a short keyword query", async () => {
-    const batches = await collect(env.engine.ask({ query: q("? kanata"), mode: "auto", collections: [COLLECTION] }));
+    const batches = await collect(
+      env.engine.ask({ query: q("? kanata"), mode: "auto", collections: [COLLECTION] }),
+    );
     expect(batches[batches.length - 1]!.mode).toBe("fast");
   });
   it("keeps the fused results and notes 'rerank skipped' when Deep passes its deadline", async () => {
     const slow = await makeEnv({ deep: fakeDeep(300), index: true });
     try {
-      const batches = await collect(slow.engine.ask({ query: q("? how do I remap modifier keys on a layer"), mode: "deep", deadlineMs: 60, collections: [COLLECTION] }));
+      const batches = await collect(
+        slow.engine.ask({
+          query: q("? how do I remap modifier keys on a layer"),
+          mode: "deep",
+          deadlineMs: 60,
+          collections: [COLLECTION],
+        }),
+      );
       const last = batches[batches.length - 1]!;
       expect(last.stage).toBe("fused");
       expect(last.note).toBe("rerank_skipped");
@@ -176,9 +249,20 @@ describe("ask", () => {
   it("falls back to Fast with a note when the Deep models are missing", async () => {
     const bare = await makeEnv({ deep: null });
     try {
-      const batches = await collect(bare.engine.ask({ query: q("? how do I remap modifier keys on a layer"), mode: "deep", collections: [COLLECTION] }));
+      const batches = await collect(
+        bare.engine.ask({
+          query: q("? how do I remap modifier keys on a layer"),
+          mode: "deep",
+          collections: [COLLECTION],
+        }),
+      );
       const last = batches[batches.length - 1]!;
-      expect(last).toMatchObject({ stage: "fused", final: true, mode: "fast", note: "model_missing" });
+      expect(last).toMatchObject({
+        stage: "fused",
+        final: true,
+        mode: "fast",
+        note: "model_missing",
+      });
     } finally {
       await bare.cleanup();
     }
@@ -187,23 +271,36 @@ describe("ask", () => {
 
 describe("similarity graph", () => {
   it("returns the anchor, its related sources and edges between them", async () => {
-    const g = await env.engine.graph({ anchor: { source: src("Garden/Garden notes 1.md") }, limit: 12, collections: [COLLECTION], loose: true });
+    const g = await env.engine.graph({
+      anchor: { source: src("Garden/Garden notes 1.md") },
+      limit: 12,
+      collections: [COLLECTION],
+      loose: true,
+    });
     expect(g.anchorIndexed).toBe(true);
     expect(g.anchor?.path).toBe("Garden/Garden notes 1.md");
     expect(g.nodes.length).toBeGreaterThan(2);
     expect(g.nodes.length).toBeLessThanOrEqual(12);
     const ids = new Set([g.anchor!.id, ...g.nodes.map((n) => n.id)]);
-    expect(g.edges.every((e) => ids.has(e.a) && ids.has(e.b) && e.a !== e.b && e.similarity > 0 && e.similarity <= 1)).toBe(true);
+    expect(
+      g.edges.every(
+        (e) => ids.has(e.a) && ids.has(e.b) && e.a !== e.b && e.similarity > 0 && e.similarity <= 1,
+      ),
+    ).toBe(true);
     // One edge from the anchor to every node, and at least one edge between two related sources.
     expect(g.edges.filter((e) => e.a === g.anchor!.id).length).toBe(g.nodes.length);
     expect(g.edges.some((e) => e.a !== g.anchor!.id)).toBe(true);
     const between = new Map<string, number>();
-    for (const e of g.edges.filter((x) => x.a !== g.anchor!.id)) for (const id of [e.a, e.b]) between.set(id, (between.get(id) ?? 0) + 1);
+    for (const e of g.edges.filter((x) => x.a !== g.anchor!.id))
+      for (const id of [e.a, e.b]) between.set(id, (between.get(id) ?? 0) + 1);
     expect(Math.max(...between.values())).toBeLessThanOrEqual(3);
   });
 
   it("reports a text anchor without an anchor node", async () => {
-    const g = await env.engine.graph({ anchor: { text: "tomato seedling compost mulch harvest soil" }, loose: true });
+    const g = await env.engine.graph({
+      anchor: { text: "tomato seedling compost mulch harvest soil" },
+      loose: true,
+    });
     expect(g.anchor).toBeNull();
     expect(g.nodes.length).toBeGreaterThan(0);
     expect(g.edges.every((e) => g.nodes.some((n) => n.id === e.a))).toBe(true);
@@ -212,7 +309,12 @@ describe("similarity graph", () => {
 
 describe("related, score and documents", () => {
   it("returns sources with their best blocks, without the anchor", async () => {
-    const res = await env.engine.related({ anchor: { source: src("Garden/Garden notes 1.md") }, limit: 10, collections: [COLLECTION], loose: true });
+    const res = await env.engine.related({
+      anchor: { source: src("Garden/Garden notes 1.md") },
+      limit: 10,
+      collections: [COLLECTION],
+      loose: true,
+    });
     expect(res.anchorIndexed).toBe(true);
     expect(res.results.length).toBeGreaterThan(0);
     expect(res.results.map((r) => r.path)).not.toContain("Garden/Garden notes 1.md");
@@ -225,17 +327,35 @@ describe("related, score and documents", () => {
     expect([...scores].sort((a, b) => b - a)).toEqual(scores);
   });
   it("supports block and text anchors, exclusion and filters", async () => {
-    const block = await env.engine.related({ anchor: { block: src("Trova.md#trova/chunk-size") }, loose: true });
+    const block = await env.engine.related({
+      anchor: { block: src("Trova.md#trova/chunk-size") },
+      loose: true,
+    });
     expect(block.anchorIndexed).toBe(true);
-    const text = await env.engine.related({ anchor: { text: "tomato seedling compost mulch harvest soil" }, loose: true, exclude: { sources: [src("Garden/Garden notes 1.md")] }, filters: q("path:Garden").filters });
+    const text = await env.engine.related({
+      anchor: { text: "tomato seedling compost mulch harvest soil" },
+      loose: true,
+      exclude: { sources: [src("Garden/Garden notes 1.md")] },
+      filters: q("path:Garden").filters,
+    });
     expect(text.results.length).toBeGreaterThan(0);
-    expect(text.results.every((r) => r.path.startsWith("Garden/") && r.path !== "Garden/Garden notes 1.md")).toBe(true);
-    const strict = await env.engine.related({ anchor: { text: "tomato seedling compost mulch harvest soil" } });
+    expect(
+      text.results.every(
+        (r) => r.path.startsWith("Garden/") && r.path !== "Garden/Garden notes 1.md",
+      ),
+    ).toBe(true);
+    const strict = await env.engine.related({
+      anchor: { text: "tomato seedling compost mulch harvest soil" },
+    });
     expect(strict.results.every((r) => r.label !== "loose")).toBe(true);
   });
   it("rejects bad anchors and unknown ids", async () => {
-    await expect(env.engine.related({ anchor: { source: "a", text: "b" } })).rejects.toMatchObject({ code: "bad_request" });
-    await expect(env.engine.related({ anchor: { source: src("Nope.md") } })).rejects.toMatchObject({ code: "not_found" });
+    await expect(env.engine.related({ anchor: { source: "a", text: "b" } })).rejects.toMatchObject({
+      code: "bad_request",
+    });
+    await expect(env.engine.related({ anchor: { source: src("Nope.md") } })).rejects.toMatchObject({
+      code: "not_found",
+    });
   });
   it("scores pairs of anchors between 0 and 1", async () => {
     const { scores } = await env.engine.score({
@@ -258,11 +378,19 @@ describe("related, score and documents", () => {
     expect(() => env.engine.get({ id: src("Trova.md#nope") })).toThrowError(/Unknown block/);
   });
   it("multi-get by ids and by glob", () => {
-    const byIds = env.engine.multiGet({ ids: [src("Trova.md"), src("Missing.md"), src("Secret.md")] });
+    const byIds = env.engine.multiGet({
+      ids: [src("Trova.md"), src("Missing.md"), src("Secret.md")],
+    });
     expect(byIds.documents.map((d) => d.path)).toEqual(["Trova.md"]);
-    expect(byIds.errors).toEqual([{ id: src("Missing.md"), code: "not_found" }, { id: src("Secret.md"), code: "not_found" }]);
+    expect(byIds.errors).toEqual([
+      { id: src("Missing.md"), code: "not_found" },
+      { id: src("Secret.md"), code: "not_found" },
+    ]);
     const byGlob = env.engine.multiGet({ glob: "Daily/*.md" });
-    expect(byGlob.documents.map((d) => d.path)).toEqual(["Daily/2026-11-10.md", "Daily/2026-11-11.md"]);
+    expect(byGlob.documents.map((d) => d.path)).toEqual([
+      "Daily/2026-11-10.md",
+      "Daily/2026-11-11.md",
+    ]);
   });
   it("suggests vocabulary corrections and lists frontmatter keys", () => {
     const s = env.engine.vocabSuggest({ terms: ["lighthuose"] });
@@ -280,7 +408,9 @@ describe("vault care analysis", () => {
     await env.engine.drain();
     const d = env.engine.getDuplicates(false);
     expect(d.state).toBe("done");
-    expect(d.pairs.some((p) => [p.aPath, p.bPath].sort().join("|") === "Dup A.md|Dup B.md")).toBe(true);
+    expect(d.pairs.some((p) => [p.aPath, p.bPath].sort().join("|") === "Dup A.md|Dup B.md")).toBe(
+      true,
+    );
   });
   it("clusters the vault into labelled topics", async () => {
     env.engine.getTopics(true);
@@ -289,7 +419,9 @@ describe("vault care analysis", () => {
     expect(t.state).toBe("done");
     expect(t.clusters.length).toBeGreaterThan(2);
     expect(t.clusters[0]!.label.length).toBeGreaterThan(0);
-    expect(t.clusters.every((c) => c.sources.every((s) => s.x >= 0 && s.x <= 1 && s.y >= 0 && s.y <= 1))).toBe(true);
+    expect(
+      t.clusters.every((c) => c.sources.every((s) => s.x >= 0 && s.x <= 1 && s.y >= 0 && s.y <= 1)),
+    ).toBe(true);
   });
 });
 
@@ -306,7 +438,9 @@ describe("sync: changes, renames, jobs and events", () => {
     off();
     expect(paths(await lex("quokkas"))).toEqual(["Fresh.md"]);
     expect(events.some((e) => e.event === "index.progress")).toBe(true);
-    expect(events.find((e) => e.event === "results.stale")!.data["sources"]).toContain(src("Fresh.md"));
+    expect(events.find((e) => e.event === "results.stale")!.data["sources"]).toContain(
+      src("Fresh.md"),
+    );
     expect(events.some((e) => e.event === "index.ready")).toBe(true);
     expect(env.engine.get({ id: src("Tools/Kanata.md#usage") }).id).toBe(before);
     const related = await env.engine.related({ anchor: { source: src("Fresh.md") }, loose: true });
@@ -328,7 +462,11 @@ describe("sync: changes, renames, jobs and events", () => {
   });
   it("stores pushed OCR text for images", async () => {
     writeFileSync(join(env.vault, "shot.png"), "not really a png");
-    env.engine.attachmentText({ collection: COLLECTION, path: "shot.png", text: "Screenshot of a narwhal dashboard" });
+    env.engine.attachmentText({
+      collection: COLLECTION,
+      path: "shot.png",
+      text: "Screenshot of a narwhal dashboard",
+    });
     await env.engine.drain();
     const hit = (await lex("narwhal")).results[0]!;
     expect(hit.path).toBe("shot.png");
@@ -339,9 +477,15 @@ describe("sync: changes, renames, jobs and events", () => {
     expect(() => env.engine.cancelJob("j_999")).toThrowError(/Unknown job/);
   });
   it("sets path context and returns it on results", async () => {
-    await env.engine.addCollection({ name: COLLECTION, path: env.vault, context: { Tools: "Notes about tools I use" } });
+    await env.engine.addCollection({
+      name: COLLECTION,
+      path: env.vault,
+      context: { Tools: "Notes about tools I use" },
+    });
     expect((await lex("kanata")).results[0]!.context).toBe("Notes about tools I use");
-    expect((await env.engine.listCollections())[0]!.context).toEqual({ Tools: "Notes about tools I use" });
+    expect((await env.engine.listCollections())[0]!.context).toEqual({
+      Tools: "Notes about tools I use",
+    });
   });
 });
 
@@ -351,9 +495,14 @@ describe("HTTP server", () => {
   const call = (path: string, init: RequestInit = {}, auth = true) =>
     fetch(`http://127.0.0.1:${server.port}${path}`, {
       ...init,
-      headers: { "Content-Type": "application/json", ...(auth ? { Authorization: `Bearer ${token}` } : {}), ...(init.headers as Record<string, string>) },
+      headers: {
+        "Content-Type": "application/json",
+        ...(auth ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init.headers as Record<string, string>),
+      },
     });
-  const post = (path: string, body: unknown) => call(path, { method: "POST", body: JSON.stringify(body) });
+  const post = (path: string, body: unknown) =>
+    call(path, { method: "POST", body: JSON.stringify(body) });
 
   beforeAll(async () => {
     server = await startServer(env.engine, { token, heartbeatMs: 50 });
@@ -363,42 +512,113 @@ describe("HTTP server", () => {
   it("answers health without a token and rejects everything else without one", async () => {
     const health = await call("/health", {}, false);
     expect(health.status).toBe(200);
-    expect(await health.json()).toEqual({ ok: true, name: "trova", version: expect.any(String), api: API_VERSION, apis: [API_VERSION] });
+    expect(await health.json()).toEqual({
+      ok: true,
+      name: "trova",
+      version: expect.any(String),
+      api: API_VERSION,
+      apis: [API_VERSION],
+    });
     const res = await call("/v1/index/status", {}, false);
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: { code: "unauthorized", message: expect.any(String), retryable: false } });
-    expect((await call("/v1/index/status", { headers: { Authorization: "Bearer wrong" } }, false)).status).toBe(401);
+    expect(await res.json()).toEqual({
+      error: { code: "unauthorized", message: expect.any(String), retryable: false },
+    });
+    expect(
+      (await call("/v1/index/status", { headers: { Authorization: "Bearer wrong" } }, false))
+        .status,
+    ).toBe(401);
   });
   it("allows only the Obsidian origin and answers preflights", async () => {
-    const pre = await call("/v1/search", { method: "OPTIONS", headers: { Origin: "app://obsidian.md" } }, false);
+    const pre = await call(
+      "/v1/search",
+      { method: "OPTIONS", headers: { Origin: "app://obsidian.md" } },
+      false,
+    );
     expect(pre.status).toBe(204);
     expect(pre.headers.get("access-control-allow-origin")).toBe("app://obsidian.md");
     expect(pre.headers.get("access-control-allow-headers")).toContain("Authorization");
-    expect((await call("/v1/index/status", { headers: { Origin: "https://evil.example" } })).status).toBe(403);
-    expect((await call("/v1/index/status", { headers: { Origin: "app://obsidian.md" } })).status).toBe(200);
+    expect(
+      (await call("/v1/index/status", { headers: { Origin: "https://evil.example" } })).status,
+    ).toBe(403);
+    expect(
+      (await call("/v1/index/status", { headers: { Origin: "app://obsidian.md" } })).status,
+    ).toBe(200);
   });
   it("streams search as NDJSON, one batch per line, the last with final: true", async () => {
-    const res = await post("/v1/search", { query: q("tomato compost"), lanes: ["lex", "vec"], collections: [COLLECTION], limit: 5 });
+    const res = await post("/v1/search", {
+      query: q("tomato compost"),
+      lanes: ["lex", "vec"],
+      collections: [COLLECTION],
+      limit: 5,
+    });
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("application/x-ndjson");
-    const lines = (await res.text()).trim().split("\n").map((l) => JSON.parse(l) as ResultBatch);
+    const lines = (await res.text())
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l) as ResultBatch);
     expect(lines.map((l) => l.stage)).toEqual(["lex", "vec"]);
     expect(lines.map((l) => l.final)).toEqual([false, true]);
   });
   it("streams ask in stage order", async () => {
-    const res = await post("/v1/ask", { query: q("? what did I decide about chunk size"), mode: "deep", collections: [COLLECTION] });
-    const lines = (await res.text()).trim().split("\n").map((l) => JSON.parse(l) as ResultBatch);
+    const res = await post("/v1/ask", {
+      query: q("? what did I decide about chunk size"),
+      mode: "deep",
+      collections: [COLLECTION],
+    });
+    const lines = (await res.text())
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l) as ResultBatch);
     expect(lines.map((l) => l.stage)).toEqual(["lex", "fused", "rerank"]);
   });
   it("serves every JSON endpoint", async () => {
-    expect(((await (await post("/v1/related", { anchor: { source: src("Trova.md") }, loose: true })).json()) as { anchorIndexed: boolean }).anchorIndexed).toBe(true);
-    expect(await (await post("/v1/vocab/suggest", { terms: ["kanata"] })).json()).toEqual({ suggestions: { kanata: [] } });
-    expect(((await (await post("/v1/score", { pairs: [[{ source: src("Trova.md") }, { source: src("Trova.md") }]] })).json()) as { scores: number[] }).scores[0]).toBeCloseTo(1, 3);
-    expect(((await (await post("/v1/documents/get", { id: src("Trova.md") })).json()) as { path: string }).path).toBe("Trova.md");
-    expect(((await (await post("/v1/documents/multi-get", { glob: "Daily/*" })).json()) as { documents: unknown[] }).documents).toHaveLength(2);
-    expect(((await (await call("/v1/collections")).json()) as { collections: { name: string }[] }).collections[0]!.name).toBe(COLLECTION);
-    expect(((await (await call("/v1/metadata/keys")).json()) as { keys: Record<string, string[]> }).keys["status"]).toBeDefined();
-    expect(((await (await call("/v1/index/status")).json()) as { api: string }).api).toBe(API_VERSION);
+    expect(
+      (
+        (await (
+          await post("/v1/related", { anchor: { source: src("Trova.md") }, loose: true })
+        ).json()) as { anchorIndexed: boolean }
+      ).anchorIndexed,
+    ).toBe(true);
+    expect(await (await post("/v1/vocab/suggest", { terms: ["kanata"] })).json()).toEqual({
+      suggestions: { kanata: [] },
+    });
+    expect(
+      (
+        (await (
+          await post("/v1/score", {
+            pairs: [[{ source: src("Trova.md") }, { source: src("Trova.md") }]],
+          })
+        ).json()) as { scores: number[] }
+      ).scores[0],
+    ).toBeCloseTo(1, 3);
+    expect(
+      (
+        (await (await post("/v1/documents/get", { id: src("Trova.md") })).json()) as {
+          path: string;
+        }
+      ).path,
+    ).toBe("Trova.md");
+    expect(
+      (
+        (await (await post("/v1/documents/multi-get", { glob: "Daily/*" })).json()) as {
+          documents: unknown[];
+        }
+      ).documents,
+    ).toHaveLength(2);
+    expect(
+      ((await (await call("/v1/collections")).json()) as { collections: { name: string }[] })
+        .collections[0]!.name,
+    ).toBe(COLLECTION);
+    expect(
+      ((await (await call("/v1/metadata/keys")).json()) as { keys: Record<string, string[]> }).keys[
+        "status"
+      ],
+    ).toBeDefined();
+    expect(((await (await call("/v1/index/status")).json()) as { api: string }).api).toBe(
+      API_VERSION,
+    );
     const sync = await post("/v1/index/sync", { collection: COLLECTION, full: true });
     expect(sync.status).toBe(202);
     const { jobId } = (await sync.json()) as { jobId: string };
@@ -423,12 +643,22 @@ describe("HTTP server", () => {
   });
   it("cancels a stream when the client disconnects", async () => {
     const controller = new AbortController();
-    const res = await call("/v1/ask", { method: "POST", body: JSON.stringify({ query: q("? how do I remap modifier keys on a layer"), mode: "deep", collections: [COLLECTION] }), signal: controller.signal });
+    const res = await call("/v1/ask", {
+      method: "POST",
+      body: JSON.stringify({
+        query: q("? how do I remap modifier keys on a layer"),
+        mode: "deep",
+        collections: [COLLECTION],
+      }),
+      signal: controller.signal,
+    });
     const reader = res.body!.getReader();
     await reader.read();
     controller.abort();
     await expect(reader.read()).rejects.toThrow();
-    expect(((await (await call("/v1/index/status")).json()) as { api: string }).api).toBe(API_VERSION);
+    expect(((await (await call("/v1/index/status")).json()) as { api: string }).api).toBe(
+      API_VERSION,
+    );
   });
   it("sends events and heartbeats over SSE", async () => {
     const controller = new AbortController();
@@ -441,7 +671,10 @@ describe("HTTP server", () => {
     writeFileSync(join(env.vault, "Sse.md"), "# Sse\nAn event stream note.\n");
     await post("/v1/index/sync", { collection: COLLECTION, changed: ["Sse.md"] });
     const deadline = Date.now() + 10000;
-    while (Date.now() < deadline && !(text.includes("event: index.ready") && text.includes(": heartbeat"))) {
+    while (
+      Date.now() < deadline &&
+      !(text.includes("event: index.ready") && text.includes(": heartbeat"))
+    ) {
       const { value, done } = await reader.read();
       if (done) break;
       text += decoder.decode(value);

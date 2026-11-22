@@ -16,7 +16,12 @@ export interface TestEnv {
   cleanup(): Promise<void>;
 }
 
-export async function makeEnv(opts: Omit<Partial<EngineOptions>, "deep"> & { deep?: ReturnType<typeof fakeDeep> | null; index?: boolean } = {}): Promise<TestEnv> {
+export async function makeEnv(
+  opts: Omit<Partial<EngineOptions>, "deep"> & {
+    deep?: ReturnType<typeof fakeDeep> | null;
+    index?: boolean;
+  } = {},
+): Promise<TestEnv> {
   const root = mkdtempSync(join(tmpdir(), "trova-test-"));
   const home = join(root, "home");
   const vault = join(root, "vault");
@@ -27,7 +32,11 @@ export async function makeEnv(opts: Omit<Partial<EngineOptions>, "deep"> & { dee
     embedder: hashEmbedder(),
     deep: opts.deep === null ? undefined : (opts.deep ?? fakeDeep()),
   });
-  await engine.addCollection({ name: COLLECTION, path: vault, options: { kind: "vault", exclude: ["Templates"] } });
+  await engine.addCollection({
+    name: COLLECTION,
+    path: vault,
+    options: { kind: "vault", exclude: ["Templates"] },
+  });
   if (opts.index !== false) {
     engine.sync({ collection: COLLECTION, full: true });
     await engine.drain();

@@ -37,7 +37,12 @@ export class Jobs {
     const queued = this.queue.find((j) => j.key === key && !j.cancel);
     if (queued) return queued.info.jobId;
     const jobId = `j_${String(++this.seq).padStart(2, "0")}`;
-    const job: Queued = { info: { jobId, kind, state: "queued", done: 0, total: 0 }, key, cancel: false, run };
+    const job: Queued = {
+      info: { jobId, kind, state: "queued", done: 0, total: 0 },
+      key,
+      cancel: false,
+      run,
+    };
     this.all.set(jobId, job);
     this.queue.push(job);
     this.sidecar.saveJob(job.info);
@@ -63,7 +68,10 @@ export class Jobs {
         const now = Date.now();
         if (now - this.lastEmit < 100 && done < total) return;
         this.lastEmit = now;
-        this.emit({ event: "index.progress", data: { jobId: job.info.jobId, kind: job.info.kind, done, total, ...extra } });
+        this.emit({
+          event: "index.progress",
+          data: { jobId: job.info.jobId, kind: job.info.kind, done, total, ...extra },
+        });
       },
       pause: () => this.idle(job),
     };
@@ -73,14 +81,18 @@ export class Jobs {
     } catch (err) {
       job.info.state = "failed";
       job.info.error = (err as Error).message;
-      this.emit({ event: "engine.state", data: { state: "error", message: job.info.error, jobId: job.info.jobId } });
+      this.emit({
+        event: "engine.state",
+        data: { state: "error", message: job.info.error, jobId: job.info.jobId },
+      });
     }
     job.info.finished = Date.now();
     this.sidecar.saveJob(job.info);
     this.current = null;
     // Keep only the most recent finished jobs in memory.
     const finished = [...this.all.values()].filter((j) => j.info.finished);
-    for (const old of finished.slice(0, Math.max(0, finished.length - 20))) this.all.delete(old.info.jobId);
+    for (const old of finished.slice(0, Math.max(0, finished.length - 20)))
+      this.all.delete(old.info.jobId);
     void this.pump();
   }
 
@@ -143,7 +155,9 @@ export class Jobs {
 
   /** Queued, running and paused jobs. */
   active(): JobInfo[] {
-    return [...this.all.values()].map((j) => j.info).filter((j) => j.state === "queued" || j.state === "running" || j.state === "paused");
+    return [...this.all.values()]
+      .map((j) => j.info)
+      .filter((j) => j.state === "queued" || j.state === "running" || j.state === "paused");
   }
 
   list(): JobInfo[] {
@@ -152,6 +166,7 @@ export class Jobs {
 
   /** Resolves when no job is queued or running. Used by the CLI and by tests. */
   async drain(): Promise<void> {
-    while (this.current || this.queue.some((j) => !j.cancel)) await new Promise<void>((r) => setTimeout(r, 10));
+    while (this.current || this.queue.some((j) => !j.cancel))
+      await new Promise<void>((r) => setTimeout(r, 10));
   }
 }

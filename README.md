@@ -49,21 +49,21 @@ trova query "how did we choose the chunk size?"
 
 ## Commands
 
-| Command | What it does |
-| --- | --- |
-| `collection add <path> [--name <name>]` | Add a folder as a collection and index it |
-| `collection ls`, `collection rm <name>`, `collection rename <old> <new>` | List, remove or rename collections |
-| `context add <collection> <path> <text>`, `context ls`, `context rm <collection> <path>` | Describe a folder to improve ranking |
-| `update [-c <collection>]` | Rescan collections for changes |
-| `embed` | Embed new and changed blocks |
-| `search`, `vsearch`, `query <query> [--mode fast\|deep]` | Keyword, vector and hybrid search |
-| `related <path>[#heading-path]` | Related sources and blocks |
-| `get <id\|path>`, `multi-get <glob \| id,id,...>` | Print one source, or several |
-| `status`, `doctor` | Health, counts and model identity |
-| `watch [--port <n>]` | Run the daemon: watcher, indexer and HTTP API |
-| `serve [--port <n>]` | HTTP API only, no watcher |
-| `mcp [--http] [--port <n>]` | MCP server over stdio, or over HTTP on 127.0.0.1 |
-| `eval` | nDCG@10 and Recall@20 on a fixture vault or your own queries |
+| Command                                                                                  | What it does                                                 |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `collection add <path> [--name <name>]`                                                  | Add a folder as a collection and index it                    |
+| `collection ls`, `collection rm <name>`, `collection rename <old> <new>`                 | List, remove or rename collections                           |
+| `context add <collection> <path> <text>`, `context ls`, `context rm <collection> <path>` | Describe a folder to improve ranking                         |
+| `update [-c <collection>]`                                                               | Rescan collections for changes                               |
+| `embed`                                                                                  | Embed new and changed blocks                                 |
+| `search`, `vsearch`, `query <query> [--mode fast\|deep]`                                 | Keyword, vector and hybrid search                            |
+| `related <path>[#heading-path]`                                                          | Related sources and blocks                                   |
+| `get <id\|path>`, `multi-get <glob \| id,id,...>`                                        | Print one source, or several                                 |
+| `status`, `doctor`                                                                       | Health, counts and model identity                            |
+| `watch [--port <n>]`                                                                     | Run the daemon: watcher, indexer and HTTP API                |
+| `serve [--port <n>]`                                                                     | HTTP API only, no watcher                                    |
+| `mcp [--http] [--port <n>]`                                                              | MCP server over stdio, or over HTTP on 127.0.0.1             |
+| `eval`                                                                                   | nDCG@10 and Recall@20 on a fixture vault or your own queries |
 
 Every command takes `--json`, `-n`/`--limit <n>` and `-c`/`--collection <name>`. `trova help` prints the full list.
 
@@ -89,20 +89,20 @@ Every command takes `--json`, `-n`/`--limit <n>` and `-c`/`--collection <name>`.
 
 qmd downloads its default models from Hugging Face into `~/.cache/qmd/models/` the first time they are needed. Each model has its own licence, and by downloading it you accept that licence:
 
-| Model | Used for | Size | Licence |
-| --- | --- | --- | --- |
-| [EmbeddingGemma 300M](https://huggingface.co/google/embeddinggemma-300m) (GGUF build by [ggml-org](https://huggingface.co/ggml-org/embeddinggemma-300M-GGUF)) | Embeddings: vector search and related notes | about 330 MB | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) and the [Gemma Prohibited Use Policy](https://ai.google.dev/gemma/prohibited_use_policy) |
-| [Qwen3-Reranker 0.6B](https://huggingface.co/Qwen/Qwen3-Reranker-0.6B) | Deep mode: reranking | about 1.7 GB together with the next model | Apache-2.0 |
-| [qmd-query-expansion 1.7B](https://huggingface.co/tobil/qmd-query-expansion-1.7B-gguf) | Deep mode: query expansion | | MIT |
+| Model                                                                                                                                                         | Used for                                    | Size                                      | Licence                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [EmbeddingGemma 300M](https://huggingface.co/google/embeddinggemma-300m) (GGUF build by [ggml-org](https://huggingface.co/ggml-org/embeddinggemma-300M-GGUF)) | Embeddings: vector search and related notes | about 330 MB                              | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) and the [Gemma Prohibited Use Policy](https://ai.google.dev/gemma/prohibited_use_policy) |
+| [Qwen3-Reranker 0.6B](https://huggingface.co/Qwen/Qwen3-Reranker-0.6B)                                                                                        | Deep mode: reranking                        | about 1.7 GB together with the next model | Apache-2.0                                                                                                                                       |
+| [qmd-query-expansion 1.7B](https://huggingface.co/tobil/qmd-query-expansion-1.7B-gguf)                                                                        | Deep mode: query expansion                  |                                           | MIT                                                                                                                                              |
 
 `trova` does not include or redistribute any model.
 
 ## Where data lives
 
-| Data | Location |
-| --- | --- |
+| Data                                         | Location                                         |
+| -------------------------------------------- | ------------------------------------------------ |
 | Index, sidecar tables, logs, attachment text | `~/.cache/trova/`, or the folder in `TROVA_HOME` |
-| Models | qmd's model cache, `~/.cache/qmd/models/` |
+| Models                                       | qmd's model cache, `~/.cache/qmd/models/`        |
 
 ## Update and uninstall
 
