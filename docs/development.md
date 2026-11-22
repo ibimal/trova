@@ -11,7 +11,7 @@
 | `test/` | Engine, contract and hardening tests, and a contract test that checks the parts of qmd the engine relies on. |
 | `build.mjs` | Bundles `src/` into `dist/cli.js` with esbuild. The dependencies stay external. |
 
-The Obsidian plugin, [trova-obsidian](https://github.com/ibimal/trova-obsidian), keeps a copy of `src/contract/` at the same path. Keep the two folders identical: copy any change across.
+The Obsidian plugin, [trova-obsidian](https://github.com/ibimal/trova-obsidian), keeps a copy of `src/contract/` and `test/contract.test.ts` at the same paths. Keep them identical: copy any change across. [`api.md`](api.md) gives the steps for an API change and the versioning rules.
 
 ## Build and test
 

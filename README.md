@@ -120,7 +120,7 @@ npm uninstall -g trova-cli
 
 ## Development
 
-[`docs/development.md`](docs/development.md) covers the layout, building, testing and releasing. [`docs/notes.md`](docs/notes.md) records where the engine differs from its specification, and [`docs/spikes.md`](docs/spikes.md) what was checked during the build.
+[`docs/development.md`](docs/development.md) covers the layout, building, testing and releasing, and [`docs/api.md`](docs/api.md) how the HTTP API, the command line and the MCP tools are versioned. [`docs/notes.md`](docs/notes.md) records where the engine differs from its specification, and [`docs/spikes.md`](docs/spikes.md) what was checked during the build.
 
 ## Acknowledgements
 

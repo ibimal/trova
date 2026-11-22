@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { API_VERSION } from "../src/contract/index.js";
 import { httpTrova, localTrova } from "../src/client.js";
 import { DaemonRunningError, startDaemon } from "../src/daemon.js";
 import { MCP_TOOLS, callTool } from "../src/mcp.js";
@@ -16,13 +17,13 @@ describe("daemon", () => {
     const daemon = await startDaemon({ home, embedder: hashEmbedder(), idleExitMs: 400, onExit: () => (exited = true) });
     try {
       const info = readDaemonInfo(home)!;
-      expect(info).toMatchObject({ pid: process.pid, port: daemon.server.port, token: daemon.token, api: "1.0" });
+      expect(info).toMatchObject({ pid: process.pid, port: daemon.server.port, token: daemon.token, api: API_VERSION });
       expect(statSync(join(home, "daemon.json")).mode & 0o777).toBe(0o600);
       // The lock is per process id; a second daemon in another process would see this one alive.
       const other = { ...info, pid: process.ppid };
       expect(new DaemonRunningError(other.pid, other.port).message).toContain("already running");
       const trova = httpTrova(info.port, info.token);
-      expect(((await trova.json("GET", "/v1/index/status")) as { api: string }).api).toBe("1.0");
+      expect(((await trova.json("GET", "/v1/index/status")) as { api: string }).api).toBe(API_VERSION);
       await new Promise((r) => setTimeout(r, 1200));
       expect(exited).toBe(true);
       expect(readDaemonInfo(home)).toBeNull();

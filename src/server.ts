@@ -5,7 +5,7 @@ import { appendFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
-import { API_VERSION, ERROR_STATUS, EngineError, type ErrorBody, type ResultBatch } from "./contract/index.js";
+import { API_VERSION, ERROR_STATUS, EngineError, type ErrorBody, type HealthResponse, type ResultBatch } from "./contract/index.js";
 import type { Engine } from "./engine.js";
 import { ENGINE_NAME, ENGINE_VERSION } from "./paths.js";
 import { dispatch } from "./routes.js";
@@ -118,7 +118,7 @@ export async function startServer(engine: Engine, opts: ServerOptions): Promise<
     const method = req.method ?? "GET";
 
     if (path === "/health" && method === "GET") {
-      return sendJson(res, 200, { ok: true, name: ENGINE_NAME, version: ENGINE_VERSION, api: API_VERSION });
+      return sendJson(res, 200, { ok: true, name: ENGINE_NAME, version: ENGINE_VERSION, api: API_VERSION, apis: [API_VERSION] } satisfies HealthResponse);
     }
     if (!authorised(req)) throw new EngineError("unauthorized", "Missing or wrong token");
     engine.lastActivity = Date.now();

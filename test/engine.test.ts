@@ -1,7 +1,7 @@
 import { renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { EngineError, type EngineEvent, type ResultBatch } from "../src/contract/index.js";
+import { API_VERSION, EngineError, type EngineEvent, type ResultBatch } from "../src/contract/index.js";
 import { startServer, type RunningServer } from "../src/server.js";
 import { fakeDeep } from "../src/testing.js";
 import { COLLECTION, collect, makeEnv, q, type TestEnv } from "./helpers.js";
@@ -20,7 +20,7 @@ const paths = (b: ResultBatch) => b.results.map((r) => r.path);
 describe("index and status", () => {
   it("indexes notes, the canvas and the PDF, and reports counts and capabilities", () => {
     const s = env.engine.status();
-    expect(s.api).toBe("1.0");
+    expect(s.api).toBe(API_VERSION);
     expect(s.engine.backend).toMatch(/^qmd \d/);
     const c = s.collections[0]!;
     expect(c.name).toBe(COLLECTION);
@@ -361,7 +361,9 @@ describe("HTTP server", () => {
   afterAll(() => server.close());
 
   it("answers health without a token and rejects everything else without one", async () => {
-    expect((await call("/health", {}, false)).status).toBe(200);
+    const health = await call("/health", {}, false);
+    expect(health.status).toBe(200);
+    expect(await health.json()).toEqual({ ok: true, name: "trova", version: expect.any(String), api: API_VERSION, apis: [API_VERSION] });
     const res = await call("/v1/index/status", {}, false);
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: { code: "unauthorized", message: expect.any(String), retryable: false } });
@@ -396,7 +398,7 @@ describe("HTTP server", () => {
     expect(((await (await post("/v1/documents/multi-get", { glob: "Daily/*" })).json()) as { documents: unknown[] }).documents).toHaveLength(2);
     expect(((await (await call("/v1/collections")).json()) as { collections: { name: string }[] }).collections[0]!.name).toBe(COLLECTION);
     expect(((await (await call("/v1/metadata/keys")).json()) as { keys: Record<string, string[]> }).keys["status"]).toBeDefined();
-    expect(((await (await call("/v1/index/status")).json()) as { api: string }).api).toBe("1.0");
+    expect(((await (await call("/v1/index/status")).json()) as { api: string }).api).toBe(API_VERSION);
     const sync = await post("/v1/index/sync", { collection: COLLECTION, full: true });
     expect(sync.status).toBe(202);
     const { jobId } = (await sync.json()) as { jobId: string };
@@ -426,7 +428,7 @@ describe("HTTP server", () => {
     await reader.read();
     controller.abort();
     await expect(reader.read()).rejects.toThrow();
-    expect(((await (await call("/v1/index/status")).json()) as { api: string }).api).toBe("1.0");
+    expect(((await (await call("/v1/index/status")).json()) as { api: string }).api).toBe(API_VERSION);
   });
   it("sends events and heartbeats over SSE", async () => {
     const controller = new AbortController();
