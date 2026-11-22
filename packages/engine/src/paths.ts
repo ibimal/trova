@@ -1,10 +1,12 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { DaemonInfo } from "@trova/contract";
+import pkg from "../package.json" with { type: "json" };
 
 export const ENGINE_NAME = "trova";
-export const ENGINE_VERSION = "0.1.0";
+/** The version in package.json, so the CLI, /health and the npm package always agree. */
+export const ENGINE_VERSION: string = pkg.version;
 
 const DEFAULT_HOME = join(homedir(), ".cache", "trova");
 
@@ -23,17 +25,9 @@ export interface DataPaths {
 }
 
 export function dataPaths(home = trovaHome()): DataPaths {
-  // The folder holds note text (index, attachment text, logs), so it is private to the user: a new
-  // folder is created that way, and the default folder is tightened if an older version made it
-  // readable by others. A folder chosen with TROVA_HOME keeps the permissions the user gave it.
+  // The folder holds note text (index, attachment text, logs), so a new folder is private to the
+  // user. An existing folder, such as one chosen with TROVA_HOME, keeps the permissions it has.
   mkdirSync(home, { recursive: true, mode: 0o700 });
-  if (home === DEFAULT_HOME) {
-    try {
-      chmodSync(home, 0o700);
-    } catch {
-      /* not ours to change; the files inside are still written by this user only */
-    }
-  }
   mkdirSync(join(home, "logs"), { recursive: true, mode: 0o700 });
   mkdirSync(join(home, "attachments"), { recursive: true, mode: 0o700 });
   return {

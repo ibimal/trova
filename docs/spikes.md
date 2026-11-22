@@ -1,6 +1,6 @@
 # Spike findings
 
-The specification (not published in this repository) listed four items to verify before building. Three concern the engine and are below; the fourth, Bases custom functions, concerns the Obsidian plugin and is recorded in its repository, [trova-obsidian](https://github.com/ibimal/trova-obsidian/blob/main/docs/notes.md). These are the findings, checked against qmd 2.9.0, the first and only qmd version the engine supports, Obsidian typings 1.14.4 and Node 24.22.2.
+The specification (not published in this repository) listed four items to verify before building. Three concern the engine and are below; the fourth, Bases custom functions, concerns the Obsidian plugin and is recorded in its repository, [trova-obsidian](https://github.com/ibimal/trova-obsidian/blob/main/docs/notes.md). These are the findings, checked against qmd 2.9.0, the first and only qmd version the engine supports, and Node 24.22.2.
 
 ## 1. A second read-only connection can query qmd's vector table
 

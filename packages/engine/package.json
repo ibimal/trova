@@ -1,6 +1,6 @@
 {
   "name": "trova-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local keyword and semantic search for Markdown notes: a command-line tool, an HTTP API and an MCP server, on top of qmd",
   "keywords": [
     "search",
