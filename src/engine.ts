@@ -170,8 +170,9 @@ export class Engine {
   private watchers = new Map<string, FSWatcher>();
   private watchTimers = new Map<string, NodeJS.Timeout>();
   private closed = false;
-  private duplicates: DuplicatesResponse = { state: "none", pairs: [] };
-  private topics: TopicsResponse = { state: "none", clusters: [] };
+  /** Analysis results, one per collection set, keyed by `analysisKey`. */
+  private duplicates = new Map<string, DuplicatesResponse>();
+  private topics = new Map<string, TopicsResponse>();
   /** Last time a client was seen. The daemon uses it for its idle exit. */
   lastActivity = Date.now();
 
@@ -184,10 +185,6 @@ export class Engine {
   ) {
     this.paths = paths;
     this.jobs = new Jobs(sidecar, (e) => this.emit(e));
-    this.duplicates = sidecar.getValue<DuplicatesResponse>("duplicates") ?? this.duplicates;
-    this.topics = sidecar.getValue<TopicsResponse>("topics") ?? this.topics;
-    if (this.duplicates.state === "running") this.duplicates.state = "none";
-    if (this.topics.state === "running") this.topics.state = "none";
   }
 
   static async open(opts: EngineOptions = {}): Promise<Engine> {
@@ -519,7 +516,14 @@ export class Engine {
     const hasVec = this.reader.hasVectors();
     const capabilities: Capability[] = ["lex", "fuzzy", "blocks", "attachments"];
     if (hasVec || models.embed.state !== "missing")
-      capabilities.push("vec", "relatedByVector", "duplicates", "topics", "graph");
+      capabilities.push(
+        "vec",
+        "relatedByVector",
+        "duplicates",
+        "topics",
+        "scopedAnalysis",
+        "graph",
+      );
     if (models.rerank.state === "ready") capabilities.push("rerank");
     if (models.expand.state === "ready") capabilities.push("expansion");
     const collections = this.sidecar.collectionNames().map((name) => {
@@ -1614,10 +1618,10 @@ export class Engine {
 
   // ---------- background analysis ----------
 
-  private analysisInput() {
+  private analysisInput(collections: string[]) {
     return {
       reader: this.reader,
-      collections: this.sidecar.collectionNames().map((name) => ({
+      collections: collections.map((name) => ({
         name,
         qmdNames: this.qmdNames([name]),
         entries: this.sidecar.entries(name),
@@ -1626,39 +1630,75 @@ export class Engine {
     };
   }
 
-  getDuplicates(start: boolean): DuplicatesResponse {
-    if (start && this.duplicates.state !== "running") {
-      const jobId = this.jobs.enqueue("duplicates", "duplicates", async (ctx) => {
-        const pairs = await findDuplicates(this.analysisInput(), ctx);
-        if (ctx.cancelled()) {
-          this.duplicates = {
-            ...this.duplicates,
-            state: this.duplicates.computedAt ? "done" : "none",
-          };
-          return;
-        }
-        this.duplicates = { state: "done", pairs, computedAt: Date.now() };
-        this.sidecar.setValue("duplicates", this.duplicates);
-      });
-      this.duplicates = { ...this.duplicates, state: "running", jobId };
-    }
-    return this.duplicates;
+  /**
+   * The sidecar key of one analysis result. A request without collections covers every collection
+   * and keeps the key that engines before API 1.2 used, so an earlier result stays readable.
+   */
+  private analysisKey(kind: "duplicates" | "topics", collections?: string[]): string {
+    if (!collections || collections.length === 0) return kind;
+    return `${kind}:${JSON.stringify([...new Set(collections)].sort())}`;
   }
 
-  getTopics(start: boolean): TopicsResponse {
-    if (start && this.topics.state !== "running") {
-      const jobId = this.jobs.enqueue("topics", "topics", async (ctx) => {
-        const clusters = await findTopics(this.analysisInput(), ctx);
+  /** The cached result for one key: from memory, else from the sidecar, else `empty`. */
+  private analysisResult<T extends { state: string }>(
+    cache: Map<string, T>,
+    key: string,
+    empty: T,
+  ): T {
+    let result = cache.get(key);
+    if (!result) {
+      result = this.sidecar.getValue<T>(key) ?? empty;
+      // A result saved as running belongs to a daemon that stopped before the job finished.
+      if (result.state === "running") result = { ...result, state: "none" };
+      cache.set(key, result);
+    }
+    return result;
+  }
+
+  getDuplicates(start: boolean, collections?: string[]): DuplicatesResponse {
+    const key = this.analysisKey("duplicates", collections);
+    const current = this.analysisResult(this.duplicates, key, { state: "none", pairs: [] });
+    if (start && current.state !== "running") {
+      const jobId = this.jobs.enqueue("duplicates", key, async (ctx) => {
+        const pairs = await findDuplicates(
+          this.analysisInput(this.collectionsFor(collections)),
+          ctx,
+        );
+        const before = this.duplicates.get(key)!;
         if (ctx.cancelled()) {
-          this.topics = { ...this.topics, state: this.topics.computedAt ? "done" : "none" };
+          this.duplicates.set(key, { ...before, state: before.computedAt ? "done" : "none" });
           return;
         }
-        this.topics = { state: "done", clusters, computedAt: Date.now() };
-        this.sidecar.setValue("topics", this.topics);
+        const result: DuplicatesResponse = { state: "done", pairs, computedAt: Date.now() };
+        this.duplicates.set(key, result);
+        this.sidecar.setValue(key, result);
       });
-      this.topics = { ...this.topics, state: "running", jobId };
+      this.duplicates.set(key, { ...current, state: "running", jobId });
     }
-    return this.topics;
+    return this.duplicates.get(key)!;
+  }
+
+  getTopics(start: boolean, collections?: string[]): TopicsResponse {
+    const key = this.analysisKey("topics", collections);
+    const current = this.analysisResult(this.topics, key, { state: "none", clusters: [] });
+    if (start && current.state !== "running") {
+      const jobId = this.jobs.enqueue("topics", key, async (ctx) => {
+        const clusters = await findTopics(
+          this.analysisInput(this.collectionsFor(collections)),
+          ctx,
+        );
+        const before = this.topics.get(key)!;
+        if (ctx.cancelled()) {
+          this.topics.set(key, { ...before, state: before.computedAt ? "done" : "none" });
+          return;
+        }
+        const result: TopicsResponse = { state: "done", clusters, computedAt: Date.now() };
+        this.topics.set(key, result);
+        this.sidecar.setValue(key, result);
+      });
+      this.topics.set(key, { ...current, state: "running", jobId });
+    }
+    return this.topics.get(key)!;
   }
 
   renameHistory(): { old_id: string; new_id: string; at: number }[] {

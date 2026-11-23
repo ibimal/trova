@@ -9,6 +9,15 @@ export type Dispatched =
   | { kind: "stream"; batches: AsyncGenerator<ResultBatch> }
   | { kind: "empty"; status: number };
 
+/** The optional `collections` field of a request body, checked to be a list of names. */
+function bodyCollections(body: Record<string, unknown>): string[] | undefined {
+  const value = body["collections"];
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || !value.every((v) => typeof v === "string"))
+    throw new EngineError("bad_request", "collections must be a list of collection names");
+  return value;
+}
+
 export async function dispatch(
   engine: Engine,
   method: string,
@@ -79,13 +88,13 @@ export async function dispatch(
     case "POST /v1/attachments/text":
       return json(engine.attachmentText(b), 202);
     case "GET /v1/duplicates":
-      return json(engine.getDuplicates(false));
+      return json(engine.getDuplicates(false, params.getAll("collection")));
     case "POST /v1/duplicates":
-      return json(engine.getDuplicates(true), 202);
+      return json(engine.getDuplicates(true, bodyCollections(body)), 202);
     case "GET /v1/topics":
-      return json(engine.getTopics(false));
+      return json(engine.getTopics(false, params.getAll("collection")));
     case "POST /v1/topics":
-      return json(engine.getTopics(true), 202);
+      return json(engine.getTopics(true, bodyCollections(body)), 202);
     case "POST /v1/models/download":
       return json(engine.downloadModels(), 202);
     case "POST /v1/keepalive":

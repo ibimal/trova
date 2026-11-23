@@ -7,6 +7,8 @@ import {
   type EngineEvent,
   type ResultBatch,
 } from "../src/contract/index.js";
+import { writeFixtureVault } from "../src/eval/fixture.js";
+import { dispatch } from "../src/routes.js";
 import { startServer, type RunningServer } from "../src/server.js";
 import { fakeDeep } from "../src/testing.js";
 import { COLLECTION, collect, makeEnv, q, type TestEnv } from "./helpers.js";
@@ -422,6 +424,97 @@ describe("vault care analysis", () => {
     expect(
       t.clusters.every((c) => c.sources.every((s) => s.x >= 0 && s.x <= 1 && s.y >= 0 && s.y <= 1)),
     ).toBe(true);
+  });
+});
+
+describe("vault care analysis per collection set", () => {
+  const OTHER = "vault-test0002";
+  let two: TestEnv;
+  beforeAll(async () => {
+    two = await makeEnv();
+    const other = join(two.home, "..", "other");
+    writeFixtureVault(other);
+    await two.engine.addCollection({
+      name: OTHER,
+      path: other,
+      options: { kind: "vault", exclude: ["Templates"] },
+    });
+    two.engine.sync({ collection: OTHER, full: true });
+    await two.engine.drain();
+  }, 120000);
+  afterAll(() => two.cleanup());
+  const inCollection = (collection: string) => (id: string) => id.startsWith(`${collection}:`);
+
+  it("keeps separate near-duplicates for each collection set", async () => {
+    two.engine.getDuplicates(true, [COLLECTION]);
+    two.engine.getDuplicates(true, [OTHER]);
+    two.engine.getDuplicates(true);
+    await two.engine.drain();
+    const mine = two.engine.getDuplicates(false, [COLLECTION]);
+    const theirs = two.engine.getDuplicates(false, [OTHER]);
+    const all = two.engine.getDuplicates(false);
+    expect([mine.state, theirs.state, all.state]).toEqual(["done", "done", "done"]);
+    expect(mine.pairs.length).toBeGreaterThan(0);
+    expect(
+      mine.pairs.every((p) => inCollection(COLLECTION)(p.a) && inCollection(COLLECTION)(p.b)),
+    ).toBe(true);
+    expect(theirs.pairs.every((p) => inCollection(OTHER)(p.a) && inCollection(OTHER)(p.b))).toBe(
+      true,
+    );
+    // The two collections hold the same notes, so a scan of both pairs each note with its copy.
+    expect(
+      all.pairs.some((p) => inCollection(COLLECTION)(p.a) !== inCollection(COLLECTION)(p.b)),
+    ).toBe(true);
+    // Scanning one set leaves the others' results as they were.
+    two.engine.getDuplicates(true, [OTHER]);
+    await two.engine.drain();
+    expect(two.engine.getDuplicates(false, [COLLECTION])).toEqual(mine);
+  });
+  it("keeps separate topic maps for each collection set", async () => {
+    two.engine.getTopics(true, [COLLECTION]);
+    two.engine.getTopics(true, [OTHER]);
+    await two.engine.drain();
+    const mine = two.engine.getTopics(false, [COLLECTION]);
+    const theirs = two.engine.getTopics(false, [OTHER]);
+    expect(mine.clusters.length).toBeGreaterThan(2);
+    expect(mine.clusters.every((c) => c.sources.every((s) => inCollection(COLLECTION)(s.id)))).toBe(
+      true,
+    );
+    expect(theirs.clusters.every((c) => c.sources.every((s) => inCollection(OTHER)(s.id)))).toBe(
+      true,
+    );
+    expect(two.engine.getTopics(false).state).toBe("none");
+  });
+  it("routes collections from the POST body and the GET query, and ignores their order", async () => {
+    const both = [OTHER, COLLECTION];
+    const started = await dispatch(
+      two.engine,
+      "POST",
+      "/v1/topics",
+      { collections: both },
+      new URLSearchParams(),
+    );
+    expect(started).toMatchObject({ kind: "json", status: 202, body: { state: "running" } });
+    await two.engine.drain();
+    const query = new URLSearchParams([
+      ["collection", COLLECTION],
+      ["collection", OTHER],
+    ]);
+    const got = await dispatch(two.engine, "GET", "/v1/topics", {}, query);
+    expect(got).toMatchObject({ kind: "json", body: { state: "done" } });
+    expect(got).toEqual({ kind: "json", status: 200, body: two.engine.getTopics(false, both) });
+    await expect(
+      dispatch(
+        two.engine,
+        "POST",
+        "/v1/duplicates",
+        { collections: COLLECTION },
+        new URLSearchParams(),
+      ),
+    ).rejects.toMatchObject({ code: "bad_request" });
+  });
+  it("announces the scopedAnalysis capability", () => {
+    expect(two.engine.status().capabilities).toContain("scopedAnalysis");
   });
 });
 

@@ -2,6 +2,10 @@
 
 All notable changes to `trova-cli`. Versions follow [semantic versioning](https://semver.org); while below 1.0, a minor version may change commands or output, and these notes say so. [`docs/api.md`](docs/api.md) explains how the HTTP API is versioned.
 
+## Unreleased
+
+- `POST /v1/duplicates` and `POST /v1/topics` take an optional `collections` list, and `GET /v1/duplicates` and `GET /v1/topics` take the same list as repeated `collection` query parameters. The engine computes and keeps one result for each set of collections, so one vault's scan no longer replaces another's, and a vault's topic clusters and labels come only from its own notes. A request without collections still covers every collection and reads the result saved by earlier versions. The new `scopedAnalysis` capability announces this, and the HTTP API is now version 1.2.
+
 ## 0.1.2 - 2026-11-22
 
 - `GET /health` adds `apis`, the list of API versions the engine serves, so a client can tell an engine that serves several major versions apart from one that serves only a newer one. The HTTP API is now version 1.1.
