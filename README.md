@@ -2,7 +2,7 @@
 
 Local keyword and semantic search for folders of Markdown notes. The `trova` command (npm package `trova-cli`) indexes a folder on your machine and searches it by keyword, by meaning, or both. It runs as a command-line tool, an HTTP API and an MCP server for AI agents. It is built on [qmd](https://github.com/tobi/qmd). Your notes never leave the machine: the only network traffic is the model download from Hugging Face, and after that `trova` works offline.
 
-The same engine powers the Trova plugin for Obsidian, which lives in its own repository, [trova-obsidian](https://github.com/ibimal/trova-obsidian).
+The same engine powers the Trova plugin for Obsidian: install it from Obsidian's community plugins ([its page](https://community.obsidian.md/plugins/trova)); its code is in [trova-obsidian](https://github.com/ibimal/trova-obsidian).
 
 ## Requirements
 
